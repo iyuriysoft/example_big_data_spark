@@ -11,7 +11,11 @@ There are three tasks:
 
 The tasks are implemented in three different approaches: RDD, Dataframe, SQL
 
-As a result, the output data are in MySql database
+### Data
+
+Input data are three files input3000.txt, CountryIP.csv and CountryName.csv
+
+Output data will be in MySql database
 
 
 Run Spark example:
