@@ -1,5 +1,11 @@
+## Spark Example
 
-Run Spark
+Tasks are implemented in three different approaches: RDD, Dataframe, SQL
+
+As a result, the output data are in MySql database
+
+
+Run Spark example:
 
 ```bash
 #!/bin/bash
