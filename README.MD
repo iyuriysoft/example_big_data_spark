@@ -1,6 +1,15 @@
 ## Spark Example
 
-Tasks are implemented in three different approaches: RDD, Dataframe, SQL
+There are three tasks:
+
+5.1 Select top 10 most frequently purchased categories (using only Product)
+
+5.2 Select top 10 most frequently purchased product in each category (using only Product)
+
+6.3 Select top 10 countries with the highest money spending (using Product, CountryName, CountryIP)
+
+
+The tasks are implemented in three different approaches: RDD, Dataframe, SQL
 
 As a result, the output data are in MySql database
 
