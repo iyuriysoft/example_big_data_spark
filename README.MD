@@ -50,7 +50,7 @@ CREATE TABLE `table63ip` (
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 ```
 
-
+---
 Run Spark example:
 
 ```bash
