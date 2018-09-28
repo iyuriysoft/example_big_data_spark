@@ -11,11 +11,44 @@ There are three tasks:
 
 The tasks are implemented in three different approaches: RDD, Dataframe, SQL
 
-### Data
+### Input Data
 
-Input data are three files input3000.txt, CountryIP.csv and CountryName.csv
+Input data are three files:
 
-Output data will be in MySql database
+[input3000.txt](https://github.com/iyuriysoft/big_data_snippets/blob/master/input3000.txt)
+
+[CountryIP.csv](https://github.com/iyuriysoft/big_data_snippets/blob/master/CountryIP.csv)
+
+[CountryName.csv](https://github.com/iyuriysoft/big_data_snippets/blob/master/CountryName.csv)
+
+
+Output data Should be in MySql database
+
+### Output data in MySql tables like these:
+
+```sql
+CREATE TABLE `table51` (
+  `category` text,
+  `cnt` bigint(20) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+CREATE TABLE `table52` (
+  `name` text,
+  `category` text,
+  `cnt` bigint(20) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+CREATE TABLE `table63` (
+  `sump` double DEFAULT NULL,
+  `IP` text,
+  `countryName` text
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+CREATE TABLE `table63ip` (
+  `ip` text,
+  `sump` double DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+```
 
 
 Run Spark example:
