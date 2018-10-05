@@ -167,7 +167,7 @@ public class SparkSQL {
 
         // Define Spark Configuration
         SparkConf conf = new SparkConf().setAppName("Getting-Started").setMaster("local[*]");
-
+        
         // Create Spark Context with configuration
         JavaSparkContext sc = new JavaSparkContext(conf);
         SparkSession spark = SparkSession.builder().config(conf).getOrCreate();
