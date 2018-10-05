@@ -13,12 +13,17 @@ import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SQLContext;
 import org.apache.spark.sql.SaveMode;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.types.DataTypes;
 
 import schema.CountryIP;
 import schema.CountryName;
 import schema.Product;
+import udf.UDFGetEndIP;
+import udf.UDFGetIP;
+import udf.UDFGetStartIP;
 
 //|  category|cnt|
 //+----------+---+
@@ -102,21 +107,30 @@ import schema.Product;
 //+-----+--------------+---------+-------------------+---------------+
 
 public class SparkSQL {
-    private static final String MYSQL_DB = "dbo2";
+    private static final String MYSQL_DB = "dbo";
     private static final String MYSQL_DRIVER = "com.mysql.jdbc.Driver";
     private static final String MYSQL_CONNECTION_URL = "jdbc:mysql://localhost/";
     private static final String MYSQL_USERNAME = "root";
     private static final String MYSQL_PWD = "password";
 
     private static final String DATA_PATH = "/Users/Shared/test/";
-    private static final String PRODUCT_PATH = DATA_PATH + "input3000.txt";
-    private static final String COUNTRYIP_PATH = DATA_PATH + "CountryIP.csv";
-    private static final String COUNTRYNAME_PATH = DATA_PATH + "CountryName.csv";
+    private static final String INP_PRODUCT = "input3000.txt";
+    private static final String INP_COUNTRYIP = "CountryIP.csv";
+    private static final String INP_COUNTRYNAME = "CountryName.csv";
+    private static final String EXT = "csv";
+    private static final String OUT_NAME_51 = "table51";
+    private static final String OUT_NAME_52 = "table52";
+    private static final String OUT_NAME_63 = "table63";
+    private static final String OUT_NAME_63IP = "table63ip";   
+    
+    private static final String PRODUCT_PATH = DATA_PATH + INP_PRODUCT;
+    private static final String COUNTRYIP_PATH = DATA_PATH + INP_COUNTRYIP;
+    private static final String COUNTRYNAME_PATH = DATA_PATH + INP_COUNTRYNAME;
 
-    private static final String OUT_51_PATH = DATA_PATH + "df_51.csv";
-    private static final String OUT_52_PATH = DATA_PATH + "df_52.csv";
-    private static final String OUT_63_PATH = DATA_PATH + "df_63.csv";
-    private static final String OUT_63IP_PATH = DATA_PATH + "df_63ip.csv";
+    private static final String OUT_51_PATH = DATA_PATH + OUT_NAME_51 + "." + EXT;
+    private static final String OUT_52_PATH = DATA_PATH + OUT_NAME_52 + "." + EXT;
+    private static final String OUT_63_PATH = DATA_PATH + OUT_NAME_63 + "." + EXT;
+    private static final String OUT_63IP_PATH = DATA_PATH + OUT_NAME_63IP + "." + EXT;
 
     private static void prepareMySql(String dbname) throws ClassNotFoundException, SQLException {
         Class.forName(MYSQL_DRIVER);
@@ -127,6 +141,13 @@ public class SparkSQL {
         stmt.executeUpdate("CREATE DATABASE IF NOT EXISTS " + dbname);
         stmt.close();
         System.out.println("Database created successful");
+    }
+
+    @Deprecated
+    public static void setupUDFs(SQLContext sqlContext) {
+        sqlContext.udf().register("getIP", (String s) -> UDFGetIP.class, DataTypes.LongType);
+        sqlContext.udf().register("getStartIP", (String s) -> UDFGetStartIP.class, DataTypes.LongType);
+        sqlContext.udf().register("getEndIP", (String s) -> UDFGetEndIP.class, DataTypes.LongType);
     }
 
     public static void main(String args[]) throws ClassNotFoundException, SQLException {
@@ -170,7 +191,7 @@ public class SparkSQL {
                 .sql("SELECT category, COUNT(*) as cnt FROM product " + "GROUP BY category ORDER BY cnt DESC LIMIT 10");
         df_51.show();
         df_51.select("category", "cnt").write().mode(SaveMode.Overwrite).csv(OUT_51_PATH);
-        df_51.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, "table51", connectionProperties);
+        df_51.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_51, connectionProperties);
 
         //
         // 5.2
@@ -181,7 +202,7 @@ public class SparkSQL {
                 + "ON tp.category = tcat.category " + "GROUP BY tp.name, tp.category ORDER BY cnt DESC LIMIT 100");
         df_52.show();
         df_52.select("name", "category", "cnt").write().mode(SaveMode.Overwrite).csv(OUT_52_PATH);
-        df_52.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, "table52", connectionProperties);
+        df_52.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_52, connectionProperties);
 
         //
         // 6.3 with ip
@@ -191,7 +212,7 @@ public class SparkSQL {
                 .sql("SELECT t.ip, sum(t.price) sump FROM product t GROUP BY t.ip ORDER BY sump DESC LIMIT 10");
         df_63i.show();
         df_63i.select("ip", "sump").write().mode(SaveMode.Overwrite).csv(OUT_63IP_PATH);
-        df_63i.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, "table63ip",
+        df_63i.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_63IP,
                 connectionProperties);
 
         //
@@ -213,7 +234,7 @@ public class SparkSQL {
                 + "WHERE tp.IPAsLong <= tc.EndIPAsLong AND tp.IPAsLong >= tc.StartIPAsLong ORDER BY tp.sump DESC LIMIT 10");
         df_63.show();
         df_63.select("sump", "IP", "countryName").write().mode(SaveMode.Overwrite).csv(OUT_63_PATH);
-        df_63.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, "table63", connectionProperties);
+        df_63.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_63, connectionProperties);
 
         sc.close();
     }

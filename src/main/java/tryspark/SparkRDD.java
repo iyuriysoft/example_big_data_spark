@@ -91,16 +91,23 @@ import schema.Product;
 //528.3 3017382 France 176.128.0.0/10
 
 public class SparkRDD {
-    private static final String MYSQL_DB = "dbo3";
+    private static final String MYSQL_DB = "dbo";
     private static final String MYSQL_DRIVER = "com.mysql.jdbc.Driver";
     private static final String MYSQL_CONNECTION_URL = "jdbc:mysql://localhost/";
     private static final String MYSQL_USERNAME = "root";
     private static final String MYSQL_PWD = "password";
 
     private static final String DATA_PATH = "/Users/Shared/test/";
-    private static final String PRODUCT_PATH = DATA_PATH + "input3000.txt";
-    private static final String COUNTRYIP_PATH = DATA_PATH + "CountryIP.csv";
-    private static final String COUNTRYNAME_PATH = DATA_PATH + "CountryName.csv";
+    private static final String INP_PRODUCT = "input3000.txt";
+    private static final String INP_COUNTRYIP = "CountryIP.csv";
+    private static final String INP_COUNTRYNAME = "CountryName.csv";
+    private static final String OUT_NAME_51 = "table51";
+    private static final String OUT_NAME_52 = "table52";
+    private static final String OUT_NAME_63 = "table63";
+    
+    private static final String PRODUCT_PATH = DATA_PATH + INP_PRODUCT;
+    private static final String COUNTRYIP_PATH = DATA_PATH + INP_COUNTRYIP;
+    private static final String COUNTRYNAME_PATH = DATA_PATH + INP_COUNTRYNAME;
 
     private static Connection prepareMySql(String dbname) throws ClassNotFoundException, SQLException {
         Class.forName(MYSQL_DRIVER);
@@ -130,7 +137,10 @@ public class SparkRDD {
         //
 
         // Define Spark Configuration
-        SparkConf conf = new SparkConf().setAppName("01-Getting-Started").setMaster("local[*]");
+        SparkConf conf = new SparkConf().setAppName("01-Getting-Started").setMaster("local[*]")
+                //.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+                //.set("spark.kryo.registrationRequired", "true")
+                ;
 
         // Create Spark Context with configuration
         JavaSparkContext sc = new JavaSparkContext(conf);
@@ -172,7 +182,8 @@ public class SparkRDD {
                             DataTypes.createStructField("cnt", DataTypes.IntegerType, true)));
             JavaRDD<Row> rddRow = rdd51a.map((Tuple2<String, Integer> row) -> RowFactory.create(row._1, row._2));
             spark.createDataFrame(rddRow, schema).write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB,
-                    "table51", connectionProperties);
+                    OUT_NAME_51, connectionProperties);
+            //System.out.println(rdd51a.toDebugString());
         }
 
         // II approach
@@ -217,7 +228,7 @@ public class SparkRDD {
             JavaRDD<Row> rddRow = rdd52a.map(
                     (Tuple2<Tuple2<String, String>, Integer> row) -> RowFactory.create(row._1._1, row._1._2, row._2));
             spark.createDataFrame(rddRow, schema).write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB,
-                    "table52", connectionProperties);
+                    OUT_NAME_52, connectionProperties);
         }
 
         //
@@ -250,7 +261,7 @@ public class SparkRDD {
         }
 
         System.out.println();
-        System.out.println("6.1 join");
+        System.out.println("6.1 with join");
         {
             // join countryIP & countryName
             JavaPairRDD<Long, CountryIP> aIP = rddCountryIP.mapToPair(f -> new Tuple2<>(f.getGeonameId(), f));
@@ -293,7 +304,7 @@ public class SparkRDD {
                     (Tuple2<Tuple2<Float, Long>, Tuple2<Long, Tuple2<CountryIP, CountryName>>> row) -> 
                     RowFactory.create(row._1._1, row._1._2, row._2._2._2.getCountryName(), row._2._2._1.getNetwork()));
             spark.createDataFrame(rddRow, schema).write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB,
-                    "table61", connectionProperties);
+                    OUT_NAME_63, connectionProperties);
 
         }
 
