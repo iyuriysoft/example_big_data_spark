@@ -129,7 +129,6 @@ public class SparkRDD {
         Properties connectionProperties = new Properties();
         connectionProperties.put("user", MYSQL_USERNAME);
         connectionProperties.put("password", MYSQL_PWD);
-
         prepareMySql(MYSQL_DB);
 
         //
@@ -236,8 +235,7 @@ public class SparkRDD {
         // 6.1
         //
         //
-        // SELECT t.ip, sum(t.price) sump FROM product t GROUP BY t.ip ORDER BY sump
-        // DESC LIMIT 10;
+        // SELECT t.ip, sum(t.price) sump FROM product t GROUP BY t.ip ORDER BY sump DESC LIMIT 10;
         JavaPairRDD<Long, Iterable<Product>> rdd61 = rddProduct.groupBy(w -> w.getIPAsLong());
 
         System.out.println();
@@ -292,7 +290,6 @@ public class SparkRDD {
             // a._2._2._2.getCountryName(), a._2._2._2.getGeonameId()));
             // });
 
-            //| sump|            IP|geonameId|        countryName|        Network
             // save to database
             StructType schema = DataTypes
                     .createStructType(Arrays.asList(
