@@ -167,6 +167,8 @@ public class SparkRDD {
         // become a record in RDD
         //
 
+        boolean bSlowOn = true;
+
         // Define Spark Configuration
         SparkConf conf = new SparkConf().setAppName("01-Getting-Started").setMaster("local[*]")
         // .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
@@ -192,12 +194,13 @@ public class SparkRDD {
         //
         //
 
+        JavaPairRDD<Integer, String> rdd51;
         // I approach
         //
         System.out.println();
         System.out.println("5.1 Approach I: Using aggregateByKey - fastest");
         {
-            JavaPairRDD<Integer, String> rdd51 = rddProduct.mapToPair(f -> new Tuple2<>(f.getCategory(), 1))
+            rdd51 = rddProduct.mapToPair(f -> new Tuple2<>(f.getCategory(), 1))
                     .aggregateByKey(0, (acc, v) -> acc + v, (acc1, acc2) -> acc1 + acc2)
                     .mapToPair(f -> new Tuple2<>(f._2, f._1)).sortByKey(false);
             rdd51.take(10).stream().forEach(a -> {
@@ -209,8 +212,8 @@ public class SparkRDD {
         //
         System.out.println();
         System.out.println("5.1 Approach II: Using groupBy, sortByKey - slower than I");
-        {
-            JavaPairRDD<Integer, String> rdd51 = rddProduct.groupBy(w -> w.getCategory().trim()).mapValues(f -> {
+        if (bSlowOn) {
+            rdd51 = rddProduct.groupBy(w -> w.getCategory().trim()).mapValues(f -> {
                 return IterableUtils.size(f);
             }).mapToPair(f -> new Tuple2<>(f._2, f._1)).sortByKey(false);
             rdd51.take(10).stream().forEach(a -> {
@@ -223,7 +226,7 @@ public class SparkRDD {
         // map(f -> f.swap()).sortBy(f -> f._1, false, 1)
         System.out.println();
         System.out.println("5.1 Approach III: Using groupBy, sortBy - slower than II");
-        {
+        if (bSlowOn) {
             JavaRDD<Tuple2<Integer, String>> rdd51a = rddProduct.groupBy(w -> w.getCategory().trim()).mapValues(f -> {
                 return IterableUtils.size(f);
             }).map(f -> f.swap()).sortBy(f -> f._1, false, 1);
@@ -231,14 +234,16 @@ public class SparkRDD {
                 System.out.println(a);
             });
 
-            // save to database
+        }
+
+        // save to database
+        {
             StructType schema = DataTypes
                     .createStructType(Arrays.asList(DataTypes.createStructField("category", DataTypes.StringType, true),
                             DataTypes.createStructField("cnt", DataTypes.IntegerType, true)));
-            JavaRDD<Row> rddRow = rdd51a.map((Tuple2<Integer, String> row) -> RowFactory.create(row._2, row._1));
+            JavaRDD<Row> rddRow = rdd51.map((Tuple2<Integer, String> row) -> RowFactory.create(row._2, row._1));
             spark.createDataFrame(rddRow, schema).write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB,
                     OUT_NAME_51, connectionProperties);
-            // System.out.println(rdd51a.toDebugString());
         }
 
         //
@@ -247,13 +252,13 @@ public class SparkRDD {
         //
         //
 
+        JavaPairRDD<Integer, Tuple2<String, String>> rdd52a;
         // Approach I
         //
         System.out.println();
         System.out.println("5.2 approach I, aggregateByKey, sortByKey - fastest");
         {
-            JavaPairRDD<Integer, Tuple2<String, String>> rdd52a = rddProduct
-                    .mapToPair(f -> new Tuple2<>(new Tuple2<>(f.getCategory(), f.getName()), 1))
+            rdd52a = rddProduct.mapToPair(f -> new Tuple2<>(new Tuple2<>(f.getCategory(), f.getName()), 1))
                     .aggregateByKey(0, (acc, v) -> acc + v, (acc1, acc2) -> acc1 + acc2)
                     .mapToPair(f -> new Tuple2<>(f._2, f._1)).sortByKey(false);
             rdd52a.take(10).stream().forEach(a -> {
@@ -265,8 +270,8 @@ public class SparkRDD {
         //
         System.out.println();
         System.out.println("5.2 approach II, groupBy, sortByKey - slower than I");
-        {
-            JavaPairRDD<Integer, Tuple2<String, String>> rdd52a = rddProduct.groupBy(w -> {
+        if (bSlowOn) {
+            rdd52a = rddProduct.groupBy(w -> {
                 return new Tuple2<>(w.getCategory().trim(), w.getName().trim());
             }).mapValues(f -> {
                 return IterableUtils.size(f);
@@ -280,17 +285,19 @@ public class SparkRDD {
         //
         System.out.println();
         System.out.println("5.2 approach III, groupBy, sortBy - slower than II");
-        {
-            JavaRDD<Tuple2<Integer, Tuple2<String, String>>> rdd52a = rddProduct.groupBy(w -> {
+        if (bSlowOn) {
+            JavaRDD<Tuple2<Integer, Tuple2<String, String>>> rdd52b = rddProduct.groupBy(w -> {
                 return new Tuple2<>(w.getCategory().trim(), w.getName().trim());
             }).mapValues(f -> {
                 return IterableUtils.size(f);
             }).map(f -> f.swap()).sortBy(f -> f._1, false, 1);
-            rdd52a.take(10).stream().forEach(a -> {
+            rdd52b.take(10).stream().forEach(a -> {
                 System.out.println(a);
             });
+        }
 
-            // save to database
+        // save to database
+        {
             StructType schema = DataTypes
                     .createStructType(Arrays.asList(DataTypes.createStructField("category", DataTypes.StringType, true),
                             DataTypes.createStructField("name", DataTypes.StringType, true),
@@ -309,12 +316,13 @@ public class SparkRDD {
         // SELECT t.ip, sum(t.price) sump FROM product t GROUP BY t.ip ORDER BY sump
         // DESC LIMIT 10;
 
+        JavaPairRDD<Float, Long> rdd61a; // price <-> IP
+
         System.out.println();
         System.out.println("6.1 approach I, aggragateByKey - fastest way");
-        JavaPairRDD<Float, Long> rdd61a; // price <-> IP
         {
             rdd61a = rddProduct.mapToPair(f -> new Tuple2<>(f.getIPAsLong(), f.getPriceAsFloat()))
-                    .aggregateByKey(0.0f, (acc, v) -> v, (acc1, acc2) -> acc1 + acc2)
+                    .aggregateByKey(0.0f, (acc, v) -> acc + v, (acc1, acc2) -> acc1 + acc2)
                     .mapToPair(f -> new Tuple2<>(f._2, f._1)).sortByKey(false);
             rdd61a.take(10).forEach(a -> {
                 System.out.println(a);
@@ -323,7 +331,7 @@ public class SparkRDD {
 
         System.out.println();
         System.out.println("6.1 approach II, slow way");
-        {
+        if (bSlowOn) {
             rdd61a = rddProduct.groupBy(w -> w.getIPAsLong()).mapValues(f -> {
                 float c = 0;
                 for (Product p : f) {
@@ -339,6 +347,8 @@ public class SparkRDD {
         // limit only 10 elements for join query
         rdd61a = sc.parallelize(rdd61a.take(10)).mapToPair((x) -> new Tuple2<Float, Long>(x._1, x._2));
 
+        JavaPairRDD<Tuple2<Float, Long>, Tuple2<Long, Tuple2<CountryIP, CountryName>>> rdd61b;
+
         System.out.println();
         System.out.println("6.1 with join");
         {
@@ -348,14 +358,12 @@ public class SparkRDD {
             JavaPairRDD<Long, Tuple2<CountryIP, CountryName>> aJoin = aIP.join(aName);
             aJoin.cache();
             // cross Countries with products
-            JavaPairRDD<Tuple2<Float, Long>, Tuple2<Long, Tuple2<CountryIP, CountryName>>> rdd61b = rdd61a
-                    .cartesian(aJoin)
+            rdd61b = rdd61a.cartesian(aJoin)
                     .filter(f -> f._1._2 > f._2._2._1.getStartIPAsLong() && f._1._2 < f._2._2._1.getEndIPAsLong());
             rdd61b.cache();
             // sort
             JavaPairRDD<Float, Tuple2<Tuple2<Float, Long>, Tuple2<Long, Tuple2<CountryIP, CountryName>>>> rdd61c = rdd61b
                     .mapToPair(f -> new Tuple2<>(f._1._1, new Tuple2<>(f._1, f._2))).sortByKey(false);
-
             rdd61c.cache();
             System.out.println();
             System.out.println("sorted:");
@@ -363,19 +371,20 @@ public class SparkRDD {
                 System.out.println(String.format("%.1f %d %s %s", a._1, a._2._2._2._2.getGeonameId(),
                         a._2._2._2._2.getCountryName(), a._2._2._2._1.getNetwork()));
             });
+        }
 
-            // save to database
+        // save to database
+        {
             StructType schema = DataTypes
                     .createStructType(Arrays.asList(DataTypes.createStructField("sump", DataTypes.FloatType, true),
                             DataTypes.createStructField("geonameId", DataTypes.LongType, true),
                             DataTypes.createStructField("countryName", DataTypes.StringType, true),
-                            DataTypes.createStructField("Network", DataTypes.StringType, true)));
+                            DataTypes.createStructField("IP", DataTypes.StringType, true)));
             JavaRDD<Row> rddRow = rdd61b
                     .map((Tuple2<Tuple2<Float, Long>, Tuple2<Long, Tuple2<CountryIP, CountryName>>> row) -> RowFactory
                             .create(row._1._1, row._1._2, row._2._2._2.getCountryName(), row._2._2._1.getNetwork()));
             spark.createDataFrame(rddRow, schema).write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB,
                     OUT_NAME_63, connectionProperties);
-
         }
 
         System.out.println("That's it");
