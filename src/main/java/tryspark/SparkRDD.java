@@ -26,21 +26,7 @@ import schema.CountryIP;
 import schema.CountryName;
 import schema.Product;
 
-//5.1 sortBy
-//
-//(category9,163)
-//(category2,162)
-//(category3,162)
-//(category5,162)
-//(category12,159)
-//(category10,156)
-//(category18,155)
-//(category16,154)
-//(category8,151)
-//(category7,150)
-//
-//5.1 sortByKey
-//
+//5.1 Approach I: Using aggregateByKey - fastest
 //(163,category9)
 //(162,category2)
 //(162,category3)
@@ -52,21 +38,67 @@ import schema.Product;
 //(151,category8)
 //(150,category7)
 //
-//5.2 sortBy
+//5.1 Approach II: Using groupBy, sortByKey - slower than I
+//(163,category9)
+//(162,category2)
+//(162,category3)
+//(162,category5)
+//(159,category12)
+//(156,category10)
+//(155,category18)
+//(154,category16)
+//(151,category8)
+//(150,category7)
 //
-//((category0,product16),16)
-//((category3,product16),16)
-//((category9,product9),15)
-//((category3,product10),15)
-//((category3,product4),14)
-//((category16,product16),14)
-//((category18,product10),14)
-//((category10,product1),14)
-//((category18,product18),14)
-//((category12,product19),14)
+//5.1 Approach III: Using groupBy, sortBy - slower than II
+//(163,category9)
+//(162,category2)
+//(162,category3)
+//(162,category5)
+//(159,category12)
+//(156,category10)
+//(155,category18)
+//(154,category16)
+//(151,category8)
+//(150,category7)
+//
+//5.2 approach I, aggregateByKey, sortByKey - fastest
+//(16,(category0,product16))
+//(16,(category3,product16))
+//(15,(category9,product9))
+//(15,(category3,product10))
+//(14,(category3,product4))
+//(14,(category16,product16))
+//(14,(category18,product10))
+//(14,(category10,product1))
+//(14,(category18,product18))
+//(14,(category12,product19))
+//
+//5.2 approach II, groupBy, sortByKey - slower than I
+//(16,(category0,product16))
+//(16,(category3,product16))
+//(15,(category9,product9))
+//(15,(category3,product10))
+//(14,(category3,product4))
+//(14,(category16,product16))
+//(14,(category18,product10))
+//(14,(category10,product1))
+//(14,(category18,product18))
+//(14,(category12,product19))
+//
+//5.2 approach III, groupBy, sortBy - slower than II
+//(16,(category0,product16))
+//(16,(category3,product16))
+//(15,(category9,product9))
+//(15,(category3,product10))
+//(14,(category3,product4))
+//(14,(category16,product16))
+//(14,(category18,product10))
+//(14,(category10,product1))
+//(14,(category18,product18))
+//(14,(category12,product19))
 //
 //6.1 
-//
 //(534.0,4177887238)
 //(533.5,3609693019)
 //(532.1,4182146946)
@@ -78,8 +110,7 @@ import schema.Product;
 //(528.6,1050574175)
 //(528.3,2962904592)
 //
-//6.1 join
-//
+//6.1 with join
 //sorted:
 //533.5 6252001 "United States" 215.32.0.0/11
 //531.5 6252001 "United States" 38.101.128.0/18
@@ -89,6 +120,7 @@ import schema.Product;
 //530.3 6252001 "United States" 20.0.0.0/11
 //528.6 2921044 Germany 62.158.0.0/16
 //528.3 3017382 France 176.128.0.0/10
+//That's it
 
 public class SparkRDD {
     private static final String MYSQL_DB = "dbo";
@@ -166,9 +198,8 @@ public class SparkRDD {
         System.out.println("5.1 Approach I: Using aggregateByKey - fastest");
         {
             JavaPairRDD<Integer, String> rdd51 = rddProduct.mapToPair(f -> new Tuple2<>(f.getCategory(), 1))
-                    .aggregateByKey(0, (f1, f2) -> {
-                        return f1 + f2;
-                    }, (f1, f2) -> f1 + f2).mapToPair(f -> new Tuple2<>(f._2, f._1)).sortByKey(false);
+                    .aggregateByKey(0, (acc, v) -> acc + v, (acc1, acc2) -> acc1 + acc2)
+                    .mapToPair(f -> new Tuple2<>(f._2, f._1)).sortByKey(false);
             rdd51.take(10).stream().forEach(a -> {
                 System.out.println(a);
             });
@@ -223,9 +254,8 @@ public class SparkRDD {
         {
             JavaPairRDD<Integer, Tuple2<String, String>> rdd52a = rddProduct
                     .mapToPair(f -> new Tuple2<>(new Tuple2<>(f.getCategory(), f.getName()), 1))
-                    .aggregateByKey(0, (f1, f2) -> {
-                        return f1 + f2;
-                    }, (f1, f2) -> f1 + f2).mapToPair(f -> new Tuple2<>(f._2, f._1)).sortByKey(false);
+                    .aggregateByKey(0, (acc, v) -> acc + v, (acc1, acc2) -> acc1 + acc2)
+                    .mapToPair(f -> new Tuple2<>(f._2, f._1)).sortByKey(false);
             rdd52a.take(10).stream().forEach(a -> {
                 System.out.println(a);
             });
@@ -259,7 +289,7 @@ public class SparkRDD {
             rdd52a.take(10).stream().forEach(a -> {
                 System.out.println(a);
             });
-            
+
             // save to database
             StructType schema = DataTypes
                     .createStructType(Arrays.asList(DataTypes.createStructField("category", DataTypes.StringType, true),
@@ -322,13 +352,6 @@ public class SparkRDD {
                 System.out.println(String.format("%.1f %d %s %s", a._1, a._2._2._2._2.getGeonameId(),
                         a._2._2._2._2.getCountryName(), a._2._2._2._1.getNetwork()));
             });
-            // System.out.println();
-            // System.out.println("unsorted:");
-            // rdd61b.collect().forEach(a -> {
-            // System.out.println(String.format("%.1f %s %s %d", a._1._1,
-            // a._2._2._1.getNetwork(),
-            // a._2._2._2.getCountryName(), a._2._2._2.getGeonameId()));
-            // });
 
             // save to database
             StructType schema = DataTypes
