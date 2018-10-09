@@ -310,8 +310,19 @@ public class SparkRDD {
         // DESC LIMIT 10;
 
         System.out.println();
-        System.out.println("6.1 ");
+        System.out.println("6.1 approach I, aggragateByKey - fastest way");
         JavaPairRDD<Float, Long> rdd61a; // price <-> IP
+        {
+            rdd61a = rddProduct.mapToPair(f -> new Tuple2<>(f.getIPAsLong(), f.getPriceAsFloat()))
+                    .aggregateByKey(0.0f, (acc, v) -> v, (acc1, acc2) -> acc1 + acc2)
+                    .mapToPair(f -> new Tuple2<>(f._2, f._1)).sortByKey(false);
+            rdd61a.take(10).forEach(a -> {
+                System.out.println(a);
+            });
+        }
+
+        System.out.println();
+        System.out.println("6.1 approach II, slow way");
         {
             rdd61a = rddProduct.groupBy(w -> w.getIPAsLong()).mapValues(f -> {
                 float c = 0;
@@ -320,13 +331,13 @@ public class SparkRDD {
                 }
                 return c;
             }).mapToPair(f -> new Tuple2<>(f._2, f._1)).sortByKey(false);
-
-            // limit only 10 elements
-            rdd61a = sc.parallelize(rdd61a.take(10)).mapToPair((x) -> new Tuple2<Float, Long>(x._1, x._2));
-            rdd61a.collect().stream().forEach(a -> {
+            rdd61a.take(10).forEach(a -> {
                 System.out.println(a);
             });
         }
+
+        // limit only 10 elements for join query
+        rdd61a = sc.parallelize(rdd61a.take(10)).mapToPair((x) -> new Tuple2<Float, Long>(x._1, x._2));
 
         System.out.println();
         System.out.println("6.1 with join");
