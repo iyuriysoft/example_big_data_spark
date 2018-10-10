@@ -15,11 +15,11 @@ The tasks are implemented in three different approaches: RDD, Dataframe, SQL
 
 Input data are three files:
 
-[input3000.txt](https://github.com/iyuriysoft/big_data_snippets/blob/master/input3000.txt)
+[input3000.txt](https://github.com/iyuriysoft/big_data_sketch/blob/master/InputData/input3000.txt)
 
-[CountryIP.csv](https://github.com/iyuriysoft/big_data_snippets/blob/master/CountryIP.csv)
+[CountryIP.csv](https://github.com/iyuriysoft/big_data_sketch/blob/master/InputData/CountryIP.csv)
 
-[CountryName.csv](https://github.com/iyuriysoft/big_data_snippets/blob/master/CountryName.csv)
+[CountryName.csv](https://github.com/iyuriysoft/big_data_sketch/blob/master/InputData/CountryName.csv)
 
 
 Output data Should be in MySql database
