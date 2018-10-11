@@ -220,7 +220,7 @@ public class SparkDataframe {
 
         Dataset<Row> df_63 = df.select("ip", "IPAsLong", "price").withColumn("price", df.col("price").cast("Float"))
                 .groupBy("ip", "IPAsLong").sum("price").withColumnRenamed("sum(price)", "sump")
-                .orderBy(col("sump").desc()).limit(100).alias("tp")
+                .orderBy(col("sump").desc()).limit(10)
                 .join(dfGeoIP.as("b"),
                         (col("b.EndIPAsLong").$greater(df.col("IPAsLong")))
                                 .and(col("b.StartIPAsLong").$less(df.col("IPAsLong"))),

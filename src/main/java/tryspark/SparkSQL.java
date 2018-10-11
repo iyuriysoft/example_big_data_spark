@@ -199,7 +199,7 @@ public class SparkSQL {
         System.out.println("Select top 10 most frequently purchased product in each category:");
         Dataset<Row> df_52 = spark.sql("SELECT tp.name, tp.category, count(*) as cnt FROM product tp INNER JOIN "
                 + "(select category, count(*) as c from product group by category order by c desc) tcat "
-                + "ON tp.category = tcat.category " + "GROUP BY tp.name, tp.category ORDER BY cnt DESC LIMIT 100");
+                + "ON tp.category = tcat.category " + "GROUP BY tp.name, tp.category ORDER BY cnt DESC LIMIT 10");
         df_52.show();
         df_52.select("name", "category", "cnt").write().mode(SaveMode.Overwrite).csv(OUT_52_PATH);
         df_52.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_52, connectionProperties);
@@ -228,7 +228,7 @@ public class SparkSQL {
         dfGeoName.createOrReplaceTempView("countryname");
 
         Dataset<Row> df_63 = spark.sql("SELECT tp.sump, tp.IP, tcn.geonameId, tcn.countryName, tc.Network FROM "
-                + "(select IP, IPAsLong, sum(price) sump from product group by IP, IPAsLong order by sump desc limit 100) tp, "
+                + "(select IP, IPAsLong, sum(price) sump from product group by IP, IPAsLong order by sump desc limit 10) tp, "
                 + "(select geonameId, Network, StartIPAsLong, EndIPAsLong from countryip) tc "
                 + "INNER JOIN countryname tcn ON tc.geonameId = tcn.geonameId "
                 + "WHERE tp.IPAsLong <= tc.EndIPAsLong AND tp.IPAsLong >= tc.StartIPAsLong ORDER BY tp.sump DESC LIMIT 10");
