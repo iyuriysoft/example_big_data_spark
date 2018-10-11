@@ -347,30 +347,45 @@ public class SparkRDD {
         // limit only 10 elements for join query
         rdd61a = sc.parallelize(rdd61a.take(10)).mapToPair((x) -> new Tuple2<Float, Long>(x._1, x._2));
 
-        JavaPairRDD<Tuple2<Float, Long>, Tuple2<Long, Tuple2<CountryIP, CountryName>>> rdd61b;
+        JavaPairRDD<Tuple2<Float, Long>, Tuple2<Long, Tuple2<CountryIP, CountryName>>> rdd61b = null;
 
         System.out.println();
-        System.out.println("6.1 with join");
+        System.out.println("6.1 approach I, using union()");
+        // join countryIP & countryName
+        JavaPairRDD<Long, CountryIP> aIP = rddCountryIP.mapToPair(f -> new Tuple2<>(f.getGeonameId(), f));
+        JavaPairRDD<Long, CountryName> aName = rddCountryName.mapToPair(f -> new Tuple2<>(f.getGeonameId(), f));
+        JavaPairRDD<Long, Tuple2<CountryIP, CountryName>> aJoin = aIP.join(aName);
+        aJoin.cache();
         {
-            // join countryIP & countryName
-            JavaPairRDD<Long, CountryIP> aIP = rddCountryIP.mapToPair(f -> new Tuple2<>(f.getGeonameId(), f));
-            JavaPairRDD<Long, CountryName> aName = rddCountryName.mapToPair(f -> new Tuple2<>(f.getGeonameId(), f));
-            JavaPairRDD<Long, Tuple2<CountryIP, CountryName>> aJoin = aIP.join(aName);
-            aJoin.cache();
+            // cross Countries with products
+            for (Tuple2<Float, Long> it : rdd61a.take(10)) {
+                JavaPairRDD<Tuple2<Float, Long>, Tuple2<Long, Tuple2<CountryIP, CountryName>>> rdd = aJoin
+                        .filter(f -> it._2 > f._2._1.getStartIPAsLong() && it._2 < f._2._1.getEndIPAsLong())
+                        .mapToPair(f -> new Tuple2<>(it, f));
+                rdd61b = rdd61b == null ? rdd : rdd61b.union(rdd);
+            }
+            rdd61b.cache();
+            // show in sorted view
+            rdd61b.mapToPair(f -> new Tuple2<>(f._1._1, new Tuple2<>(f._1, f._2))).sortByKey(false).take(10)
+                    .forEach(a -> {
+                        System.out.println(String.format("%.1f %d %s %s", a._1, a._2._2._2._2.getGeonameId(),
+                                a._2._2._2._2.getCountryName(), a._2._2._2._1.getNetwork()));
+                    });
+        }
+
+        System.out.println();
+        System.out.println("6.1 approach II, using cartesian()");
+        {
             // cross Countries with products
             rdd61b = rdd61a.cartesian(aJoin)
                     .filter(f -> f._1._2 > f._2._2._1.getStartIPAsLong() && f._1._2 < f._2._2._1.getEndIPAsLong());
             rdd61b.cache();
-            // sort
-            JavaPairRDD<Float, Tuple2<Tuple2<Float, Long>, Tuple2<Long, Tuple2<CountryIP, CountryName>>>> rdd61c = rdd61b
-                    .mapToPair(f -> new Tuple2<>(f._1._1, new Tuple2<>(f._1, f._2))).sortByKey(false);
-            rdd61c.cache();
-            System.out.println();
-            System.out.println("sorted:");
-            rdd61c.take(10).forEach(a -> {
-                System.out.println(String.format("%.1f %d %s %s", a._1, a._2._2._2._2.getGeonameId(),
-                        a._2._2._2._2.getCountryName(), a._2._2._2._1.getNetwork()));
-            });
+            // show in sorted view
+            rdd61b.mapToPair(f -> new Tuple2<>(f._1._1, new Tuple2<>(f._1, f._2))).sortByKey(false).take(10)
+                    .forEach(a -> {
+                        System.out.println(String.format("%.1f %d %s %s", a._1, a._2._2._2._2.getGeonameId(),
+                                a._2._2._2._2.getCountryName(), a._2._2._2._1.getNetwork()));
+                    });
         }
 
         // save to database
