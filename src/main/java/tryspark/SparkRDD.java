@@ -348,14 +348,15 @@ public class SparkRDD {
         rdd61a = sc.parallelize(rdd61a.take(10)).mapToPair((x) -> new Tuple2<Float, Long>(x._1, x._2));
 
         JavaPairRDD<Tuple2<Float, Long>, Tuple2<Long, Tuple2<CountryIP, CountryName>>> rdd61b = null;
-
-        System.out.println();
-        System.out.println("6.1 approach I, using union()");
+        
         // join countryIP & countryName
         JavaPairRDD<Long, CountryIP> aIP = rddCountryIP.mapToPair(f -> new Tuple2<>(f.getGeonameId(), f));
         JavaPairRDD<Long, CountryName> aName = rddCountryName.mapToPair(f -> new Tuple2<>(f.getGeonameId(), f));
         JavaPairRDD<Long, Tuple2<CountryIP, CountryName>> aJoin = aIP.join(aName);
         aJoin.cache();
+
+        System.out.println();
+        System.out.println("6.1 approach I, using union()");
         {
             // cross Countries with products
             for (Tuple2<Float, Long> it : rdd61a.take(10)) {
