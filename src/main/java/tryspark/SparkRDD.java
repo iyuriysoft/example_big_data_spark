@@ -269,10 +269,10 @@ public class SparkRDD {
     }
 
     /**
-     * task 63; approach 1 cross Countries with Products
+     * task 63; approach 1; using filter() & union() to cross Countries with Products
      * 
      * @param rddProduct       JavaRDD
-     * @param rddCountryNameIP JavaPairRDD<(Country id), Tuple2<(Country IP),
+     * @param rddCountryNameIP JavaPairRDD<(geo name id), Tuple2<(Country IP),
      *                         (Country Name)>>
      * @return JavaPairRDD<Tuple2<(sum of prices), (IP as Long)>, Tuple2<(Country
      *         Id), Tuple2<(Country IP), (Country Name)>>>
@@ -295,10 +295,10 @@ public class SparkRDD {
     }
 
     /**
-     * task 63; approach 2; using cartesian() cross Countries with Products
+     * task 63; approach 2; using cartesian() to cross Countries with Products
      * 
      * @param rddProduct       JavaRDD
-     * @param rddCountryNameIP JavaPairRDD<(Country id), Tuple2<(Country IP),
+     * @param rddCountryNameIP JavaPairRDD<(geo name id), Tuple2<(Country IP),
      *                         (Country Name)>>
      * @param sc               Java Spark Context
      * @return JavaPairRDD<Tuple2<(sum of prices), (IP as Long)>, Tuple2<(Country
@@ -319,7 +319,7 @@ public class SparkRDD {
     }
 
     /**
-     * decides task N51 different approaches and put the result to database
+     * decide task N51 different approaches and put the result in the database
      * 
      * @param rddProduct           JavaRDD
      * @param spark                session
@@ -368,7 +368,7 @@ public class SparkRDD {
     }
 
     /**
-     * decides task N52 different approaches and put the result to database
+     * decide task N52 different approaches and put the result in the database
      *
      * @param rddProduct           JavaRDD
      * @param spark                session
@@ -444,10 +444,10 @@ public class SparkRDD {
     }
 
     /**
-     * decides task N63 with country names
+     * decide task N63 with country names
      *
      * @param rddProduct           JavaRDD
-     * @param rddCountryNameIP     JavaPairRDD<(Country id), Tuple2<(Country IP),
+     * @param rddCountryNameIP     JavaPairRDD<(geo name id), Tuple2<(Country IP),
      *                             (Country Name)>>
      * @param spark                session
      * @param connectionProperties MySql properties
@@ -533,12 +533,12 @@ public class SparkRDD {
         rddCountryIP.cache();
 
         //
-        // 5.1 Select top 10 most frequently purchased categories (using only Product)
+        // 5.1 Select top 10 most frequently purchased categories
         //
         doTask_51(rddProduct, spark, connectionProperties);
 
         //
-        // 5.2 Select top 10 most frequently purchased product in each category (using only Product)
+        // 5.2 Select top 10 most frequently purchased product in each category
         //
         doTask_52(rddProduct, spark, connectionProperties);
 
