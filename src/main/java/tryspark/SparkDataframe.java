@@ -17,6 +17,7 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SaveMode;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.functions;
 
 import schema.CountryIP;
 import schema.CountryName;
@@ -38,8 +39,6 @@ import schema.Product;
 //
 //Select top 10 most frequently purchased product in each category:
 //
-//
-//[Stage 15:==========================================>           (158 + 2) / 200]
 //+---------+----------+---+
 //|     name|  category|cnt|
 //+---------+----------+---+
@@ -67,41 +66,20 @@ import schema.Product;
 //only showing top 20 rows
 //
 //
-//
-//[Stage 22:===============================================>      (175 + 2) / 200]
-//Select top 10 IP with the highest money spending:
-//+--------------+-----+
-//|            ip| sump|
-//+--------------+-----+
-//|   249.5.128.6|534.0|
-//| 215.39.139.91|533.5|
-//|249.70.127.130|532.1|
-//|38.101.171.224|531.5|
-//| 27.238.136.11|531.4|
-//|  84.38.11.162|531.1|
-//|116.48.124.164|530.8|
-//| 20.25.239.179|530.3|
-//| 62.158.125.95|528.6|
-//| 176.154.86.16|528.3|
-//+--------------+-----+
-//
-//Select top 10 countries with the highest money spending
-//
-//
-//[Stage 43:>                 (0 + 2) / 2][Stage 44:>                 (0 + 0) / 2]
-//[Stage 43:=========>        (1 + 1) / 2][Stage 44:>                 (0 + 1) / 2]
-//+-----+--------------+---------+-------------------+---------------+
-//| sump|            IP|geonameId|        countryName|        Network|
-//+-----+--------------+---------+-------------------+---------------+
-//|533.5| 215.39.139.91|  6252001|    "United States"|  215.32.0.0/11|
-//|531.5|38.101.171.224|  6252001|    "United States"|38.101.128.0/18|
-//|531.4| 27.238.136.11|  1835841|"Republic of Korea"|  27.232.0.0/13|
-//|531.1|  84.38.11.162|  3144096|             Norway|   84.38.8.0/21|
-//|530.8|116.48.124.164|  1819730|        "Hong Kong"|  116.48.0.0/15|
-//|530.3| 20.25.239.179|  6252001|    "United States"|    20.0.0.0/11|
-//|528.6| 62.158.125.95|  2921044|            Germany|  62.158.0.0/16|
-//|528.3| 176.154.86.16|  3017382|             France| 176.128.0.0/10|
-//+-----+--------------+---------+-------------------+---------------+
+//+------------------+----+---------+-------------------+
+//|              sump| cnt|geonameId|        countryName|
+//+------------------+----+---------+-------------------+
+//| 559990.8999633789|1120|  6252001|    "United States"|
+//|126911.90008544922| 254|  1814991|              China|
+//| 71033.39999389648| 142|  1861060|              Japan|
+//| 46460.10009765625|  93|  2921044|            Germany|
+//| 41081.20001220703|  82|  2635167|   "United Kingdom"|
+//| 40283.20004272461|  81|  1835841|"Republic of Korea"|
+//| 32557.20001220703|  65|  3017382|             France|
+//|29975.200073242188|  60|  6251999|             Canada|
+//|28451.199981689453|  57|  3469034|             Brazil|
+//| 25028.09994506836|  50|  3175395|              Italy|
+//+------------------+----+---------+-------------------+
 
 public class SparkDataframe {
     private static final String MYSQL_DB = "dbo";
@@ -118,8 +96,7 @@ public class SparkDataframe {
     private static final String OUT_NAME_51 = "table51";
     private static final String OUT_NAME_52 = "table52";
     private static final String OUT_NAME_63 = "table63";
-    private static final String OUT_NAME_63IP = "table63ip";   
-    
+
     private static final String PRODUCT_PATH = DATA_PATH + INP_PRODUCT;
     private static final String COUNTRYIP_PATH = DATA_PATH + INP_COUNTRYIP;
     private static final String COUNTRYNAME_PATH = DATA_PATH + INP_COUNTRYNAME;
@@ -127,7 +104,6 @@ public class SparkDataframe {
     private static final String OUT_51_PATH = DATA_PATH + OUT_NAME_51 + "." + EXT;
     private static final String OUT_52_PATH = DATA_PATH + OUT_NAME_52 + "." + EXT;
     private static final String OUT_63_PATH = DATA_PATH + OUT_NAME_63 + "." + EXT;
-    private static final String OUT_63IP_PATH = DATA_PATH + OUT_NAME_63IP + "." + EXT;
 
     private static void prepareMySql(String dbname) throws ClassNotFoundException, SQLException {
         Class.forName(MYSQL_DRIVER);
@@ -196,17 +172,6 @@ public class SparkDataframe {
         df_52.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_52, connectionProperties);
 
         //
-        // 6.3 with ip
-        //
-        System.out.println("Select top 10 IP with the highest money spending:");
-        Dataset<Row> df_63i = df.select("ip", "price").withColumn("price", df.col("price").cast("Float")).groupBy("ip")
-                .sum("price").withColumnRenamed("sum(price)", "sump").orderBy(col("sump").desc()).limit(10);
-        df_63i.show();
-        df_63i.select("ip", "sump").write().mode(SaveMode.Overwrite).csv(OUT_63IP_PATH);
-        df_63i.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_63IP,
-                connectionProperties);
-
-        //
         // 6.3 with country name
         //
         System.out.println("Select top 10 countries with the highest money spending");
@@ -218,18 +183,31 @@ public class SparkDataframe {
         Dataset<Row> dfGeoName = spark.createDataFrame(rddGeoName, CountryName.class);
         dfGeoName.createOrReplaceTempView("countryname");
 
+        // SQL equivalent:
+        //
+        // SELECT SUM(t.price) as summ, count(*) as cnt, t.geonameId, tcn.countryName
+        // FROM (SELECT tp.price, tp.IP, tc.Network, tc.geonameId
+        // FROM (select price, IP, IPAsLong from product) tp,
+        // (select geonameId, Network, StartIPAsLong, EndIPAsLong from countryip) tc
+        // WHERE tp.IPAsLong <= tc.EndIPAsLong AND tp.IPAsLong >= tc.StartIPAsLong ORDER
+        // BY tc.geonameId) t
+        // INNER JOIN countryname tcn ON t.geonameId = tcn.geonameId
+        // GROUP BY t.geonameId, tcn.countryName ORDER BY summ DESC LIMIT 10");
+        //
+
         Dataset<Row> df_63 = df.select("ip", "IPAsLong", "price").withColumn("price", df.col("price").cast("Float"))
-                .groupBy("ip", "IPAsLong").sum("price").withColumnRenamed("sum(price)", "sump")
-                .orderBy(col("sump").desc()).limit(10)
                 .join(dfGeoIP.as("b"),
                         (col("b.EndIPAsLong").$greater(df.col("IPAsLong")))
                                 .and(col("b.StartIPAsLong").$less(df.col("IPAsLong"))),
                         "inner")
                 .join(dfGeoName.as("a"), col("a.geonameId").equalTo(col("b.geonameId")), "inner")
+                .groupBy(col("a.geonameId"), col("a.countryName"))
+                .agg(functions.sum("price").as("sump"), functions.count("*").as("cnt"))
                 .orderBy(col("sump").desc()).limit(10)
-                .select(col("sump"), col("IP"), col("a.geonameId"), col("countryName"), col("Network"));
+                .select(col("sump"), col("cnt"), col("a.geonameId"), col("countryName"));
+
         df_63.show();
-        df_63.select("sump", "IP", "countryName").write().mode(SaveMode.Overwrite).csv(OUT_63_PATH);
+        df_63.select("sump", "cnt", "geonameId", "countryName").write().mode(SaveMode.Overwrite).csv(OUT_63_PATH);
         df_63.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_63, connectionProperties);
 
         sc.close();

@@ -13,6 +13,10 @@ public class Product implements Serializable {
     private String category;
     private String ip;
 
+    public Product(String str) {
+        this(str.split(","));
+    }
+    
     public Product(String[] fields) {
         this.name = fields[0].trim();
         this.price = fields[1].trim();

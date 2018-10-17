@@ -18,6 +18,10 @@ public class CountryIP implements Serializable {
     private String network;
     private Long geoname_id;
 
+    public CountryIP(String str) {
+        this(str.split(","));
+    }
+
     public CountryIP(String[] fields) {
         this.network = fields[0].trim();
         this.geoname_id = fields[1].trim().isEmpty() ? 0L : Long.valueOf(fields[1].trim());
