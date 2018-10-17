@@ -185,17 +185,6 @@ public class SparkSQL {
         df_52.select("name", "category", "cnt").write().mode(SaveMode.Overwrite).csv(OUT_52_PATH);
         df_52.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_52, connectionProperties);
 
-//        //
-//        // 6.3 with ip
-//        //
-//        System.out.println("Select top 10 IP with the highest money spending:");
-//        Dataset<Row> df_63i = spark
-//                .sql("SELECT t.ip, sum(t.price) sump FROM product t GROUP BY t.ip ORDER BY sump DESC LIMIT 10");
-//        df_63i.show();
-//        df_63i.select("ip", "sump").write().mode(SaveMode.Overwrite).csv(OUT_63IP_PATH);
-//        df_63i.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_63IP,
-//                connectionProperties);
-
         //
         // 6.3 with country name
         //
@@ -217,19 +206,6 @@ public class SparkSQL {
                 + "INNER JOIN countryname tcn ON t.geonameId = tcn.geonameId "
                 + "GROUP BY t.geonameId, tcn.countryName ORDER BY summ DESC LIMIT 10");
 
-//        Dataset<Row> df_63a = spark.sql(
-//                "SELECT tp.price, tp.IP, tc.Network, tc.geonameId FROM "
-//                        + "(select price, IP, IPAsLong from product) tp, "
-//                        + "(select geonameId, Network, StartIPAsLong, EndIPAsLong from countryip) tc "
-//                        + "WHERE tp.IPAsLong <= tc.EndIPAsLong AND tp.IPAsLong >= tc.StartIPAsLong ORDER BY tc.geonameId");
-//        df_63a.createOrReplaceTempView("product2");
-//        df_63a.show();
-//
-//        System.out.println("Select top 10 2");
-//        Dataset<Row> df_63b = spark.sql(
-//                "SELECT SUM(t.price) as summ, count(*) as cnt, t.geonameId, tcn.countryName FROM product2 t "
-//                        + "INNER JOIN countryname tcn ON t.geonameId = tcn.geonameId "
-//                        + "GROUP BY t.geonameId, tcn.countryName ORDER BY summ DESC LIMIT 10");
         df_63.show();
         df_63.select("summ", "cnt", "geonameId", "countryName").write().mode(SaveMode.Overwrite).csv(OUT_63_PATH);
         df_63.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_63, connectionProperties);
