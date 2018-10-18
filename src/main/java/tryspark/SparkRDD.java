@@ -231,29 +231,27 @@ public class SparkRDD {
     }
 
     /**
-     * task 63; approach 2; using cartesian() to cross Countries with Products
+     * task 63; approach 1; using cartesian() to cross Countries with Products
      * 
      * @param rddProduct       JavaRDD
-     * @param rddCountryNameIP JavaPairRDD<(geo name id), Tuple2<(Country IP),
-     *                         (Country Name)>>
+     * @param rddCountryNameIP JavaPairRDD<(geo name id), Tuple2<(Object CountryIP),
+     *                         (Object CountryName)>>
      * @param sc               Java Spark Context
-     * @return JavaPairRDD<(sum of prices), Tuple2<(Country Id), (Country Name)>>
+     * @return JavaPairRDD<(sum of prices), Tuple2<(country Id), (country Name)>>
      */
     public static JavaPairRDD<Float, Tuple2<Long, String>> task_63_approach_1(
             JavaRDD<Product> rddProduct, JavaPairRDD<Long, Tuple2<CountryIP, CountryName>> rddCountryNameIP,
             JavaSparkContext sc) {
 
-        JavaPairRDD<Float, Long> rdd = rddProduct.mapToPair(f -> new Tuple2<>(f.getPriceAsFloat(), f.getIPAsLong()))
-                .cache();
-
-        JavaPairRDD<Float, Tuple2<Long, String>> r = rdd.cartesian(rddCountryNameIP)
+        return rddProduct
+                .mapToPair(f -> new Tuple2<>(f.getPriceAsFloat(), f.getIPAsLong()))
+                .cache().cartesian(rddCountryNameIP)
                 .filter(f -> f._1._2 > f._2._2._1.getStartIPAsLong() && f._1._2 < f._2._2._1.getEndIPAsLong())
                 .mapToPair(f -> new Tuple2<>(f._2._1, f))
                 .combineByKey(x -> new Tuple2<Float, String>(x._1._1, x._2._2._2.getCountryName()),
                         (c1, v) -> new Tuple2<Float, String>(c1._1 + v._1._1, v._2._2._2.getCountryName()),
                         (c1, c2) -> new Tuple2<>(c1._1 + c2._1, c2._2))
                 .mapToPair(f -> new Tuple2<>(f._2._1, new Tuple2<>(f._1, f._2._2)));
-        return r;
     }
 
     /**
