@@ -98,28 +98,18 @@ import schema.Product;
 //(14,(category18,product18))
 //(14,(category12,product19))
 //
-//6.1 
-//(534.0,4177887238)
-//(533.5,3609693019)
-//(532.1,4182146946)
-//(531.5,644197344)
-//(531.4,468617227)
-//(531.1,1411779490)
-//(530.8,1949334692)
-//(530.3,337244083)
-//(528.6,1050574175)
-//(528.3,2962904592)
+//6.3 approach II, using cartesian(), 
 //
-//6.1 with join
-//sorted:
-//533.5 6252001 "United States" 215.32.0.0/11
-//531.5 6252001 "United States" 38.101.128.0/18
-//531.4 1835841 "Republic of Korea" 27.232.0.0/13
-//531.1 3144096 Norway 84.38.8.0/21
-//530.8 1819730 "Hong Kong" 116.48.0.0/15
-//530.3 6252001 "United States" 20.0.0.0/11
-//528.6 2921044 Germany 62.158.0.0/16
-//528.3 3017382 France 176.128.0.0/10
+//559990.9 6252001 "United States"
+//126911.9 1814991 China
+//71033.4 1861060 Japan
+//46460.1 2921044 Germany
+//41081.2 2635167 "United Kingdom"
+//40283.2 1835841 "Republic of Korea"
+//32557.2 3017382 France
+//29975.2 6251999 Canada
+//28451.2 3469034 Brazil
+//25028.1 3175395 Italy
 //That's it
 
 public class SparkRDD {
@@ -167,7 +157,7 @@ public class SparkRDD {
      * @param rddProduct JavaRDD
      * @return JavaPairRDD<(records count), (category name)>
      */
-    private static JavaPairRDD<Integer, String> task_51_approach_1(JavaRDD<Product> rddProduct) {
+    public static JavaPairRDD<Integer, String> task_51_approach_1(JavaRDD<Product> rddProduct) {
         return rddProduct.mapToPair(f -> new Tuple2<>(f.getCategory(), 1))
                 .aggregateByKey(0, (acc, v) -> acc + v, (acc1, acc2) -> acc1 + acc2)
                 .mapToPair(f -> new Tuple2<>(f._2, f._1)).sortByKey(false);
@@ -204,7 +194,7 @@ public class SparkRDD {
      * @return JavaPairRDD<(products count in the category), Tuple2<(product name),
      *         (category name)>>
      */
-    private static JavaPairRDD<Integer, Tuple2<String, String>> task_52_approach_1(JavaRDD<Product> rddProduct) {
+    public static JavaPairRDD<Integer, Tuple2<String, String>> task_52_approach_1(JavaRDD<Product> rddProduct) {
         return rddProduct.mapToPair(f -> new Tuple2<>(new Tuple2<>(f.getCategory(), f.getName()), 1))
                 .aggregateByKey(0, (acc, v) -> acc + v, (acc1, acc2) -> acc1 + acc2)
                 .mapToPair(f -> new Tuple2<>(f._2, f._1)).sortByKey(false);
@@ -241,81 +231,29 @@ public class SparkRDD {
     }
 
     /**
-     * task 63; Only ip; approach 1; using aggregateByKey(); fastest way
-     * 
-     * @param rddProduct JavaRDD
-     * @return JavaPairRDD<(sum of prices), (IP as Long)>
-     */
-    private static JavaPairRDD<Float, Long> task_63ip_approach_1(JavaRDD<Product> rddProduct) {
-        return rddProduct.mapToPair(f -> new Tuple2<>(f.getIPAsLong(), f.getPriceAsFloat()))
-                .aggregateByKey(0.0f, (acc, v) -> acc + v, (acc1, acc2) -> acc1 + acc2)
-                .mapToPair(f -> new Tuple2<>(f._2, f._1)).sortByKey(false);
-    }
-
-    /**
-     * task 63; Only ip; approach 2; using groupBy(), SortByKey()
-     * 
-     * @param rddProduct JavaRDD
-     * @return JavaPairRDD<(sum of prices), (IP as Long)>
-     */
-    private static JavaPairRDD<Float, Long> task_63ip_approach_2(JavaRDD<Product> rddProduct) {
-        return rddProduct.groupBy(w -> w.getIPAsLong()).mapValues(f -> {
-            float c = 0;
-            for (Product p : f) {
-                c = c + p.getPriceAsFloat();
-            }
-            return c;
-        }).mapToPair(f -> new Tuple2<>(f._2, f._1)).sortByKey(false);
-    }
-
-    /**
-     * task 63; approach 1; using filter() & union() to cross Countries with Products
-     * 
-     * @param rddProduct       JavaRDD
-     * @param rddCountryNameIP JavaPairRDD<(geo name id), Tuple2<(Country IP),
-     *                         (Country Name)>>
-     * @return JavaPairRDD<Tuple2<(sum of prices), (IP as Long)>, Tuple2<(Country
-     *         Id), Tuple2<(Country IP), (Country Name)>>>
-     */
-    private static JavaPairRDD<Tuple2<Float, Long>, Tuple2<Long, Tuple2<CountryIP, CountryName>>> task_63_approach_1(
-            JavaRDD<Product> rddProduct, JavaPairRDD<Long, Tuple2<CountryIP, CountryName>> rddCountryNameIP) {
-
-        JavaPairRDD<Tuple2<Float, Long>, Tuple2<Long, Tuple2<CountryIP, CountryName>>> rdd63b = null;
-        JavaPairRDD<Float, Long> rdd63 = rddProduct.mapToPair(f -> new Tuple2<>(f.getIPAsLong(), f.getPriceAsFloat()))
-                .aggregateByKey(0.0f, (acc, v) -> acc + v, (acc1, acc2) -> acc1 + acc2)
-                .mapToPair(f -> new Tuple2<>(f._2, f._1)).sortByKey(false);
-        // get Country for every ip
-        for (Tuple2<Float, Long> it : rdd63.take(10)) {
-            JavaPairRDD<Tuple2<Float, Long>, Tuple2<Long, Tuple2<CountryIP, CountryName>>> rdd = rddCountryNameIP
-                    .filter(f -> it._2 > f._2._1.getStartIPAsLong() && it._2 < f._2._1.getEndIPAsLong())
-                    .mapToPair(f -> new Tuple2<>(it, f));
-            rdd63b = rdd63b == null ? rdd : rdd63b.union(rdd);
-        }
-        return rdd63b;
-    }
-
-    /**
      * task 63; approach 2; using cartesian() to cross Countries with Products
      * 
      * @param rddProduct       JavaRDD
      * @param rddCountryNameIP JavaPairRDD<(geo name id), Tuple2<(Country IP),
      *                         (Country Name)>>
      * @param sc               Java Spark Context
-     * @return JavaPairRDD<Tuple2<(sum of prices), (IP as Long)>, Tuple2<(Country
-     *         Id), Tuple2<(Country IP), (Country Name)>>>
+     * @return JavaPairRDD<(sum of prices), Tuple2<(Country Id), (Country Name)>>
      */
-    private static JavaPairRDD<Tuple2<Float, Long>, Tuple2<Long, Tuple2<CountryIP, CountryName>>> task_63_approach_2(
+    public static JavaPairRDD<Float, Tuple2<Long, String>> task_63_approach_1(
             JavaRDD<Product> rddProduct, JavaPairRDD<Long, Tuple2<CountryIP, CountryName>> rddCountryNameIP,
             JavaSparkContext sc) {
 
-        JavaPairRDD<Float, Long> rdd63a = rddProduct.mapToPair(f -> new Tuple2<>(f.getIPAsLong(), f.getPriceAsFloat()))
-                .aggregateByKey(0.0f, (acc, v) -> acc + v, (acc1, acc2) -> acc1 + acc2)
-                .mapToPair(f -> new Tuple2<>(f._2, f._1)).sortByKey(false);
-        // limit only 10 elements for join query to speed up
-        rdd63a = sc.parallelize(rdd63a.take(10)).mapToPair((x) -> new Tuple2<Float, Long>(x._1, x._2));
-        // cross Countries with products
-        return rdd63a.cartesian(rddCountryNameIP)
-                .filter(f -> f._1._2 > f._2._2._1.getStartIPAsLong() && f._1._2 < f._2._2._1.getEndIPAsLong());
+        JavaPairRDD<Float, Long> rdd = rddProduct.mapToPair(f -> new Tuple2<>(f.getPriceAsFloat(), f.getIPAsLong()))
+                .cache();
+
+        JavaPairRDD<Float, Tuple2<Long, String>> r = rdd.cartesian(rddCountryNameIP)
+                .filter(f -> f._1._2 > f._2._2._1.getStartIPAsLong() && f._1._2 < f._2._2._1.getEndIPAsLong())
+                .mapToPair(f -> new Tuple2<>(f._2._1, f))
+                .combineByKey(x -> new Tuple2<Float, String>(x._1._1, x._2._2._2.getCountryName()),
+                        (c1, v) -> new Tuple2<Float, String>(c1._1 + v._1._1, v._2._2._2.getCountryName()),
+                        (c1, c2) -> new Tuple2<>(c1._1 + c2._1, c2._2))
+                .mapToPair(f -> new Tuple2<>(f._2._1, new Tuple2<>(f._1, f._2._2)));
+        return r;
     }
 
     /**
@@ -421,29 +359,6 @@ public class SparkRDD {
     }
 
     /**
-     * decides task N63 but only ip without country names
-     * 
-     * @param rddProduct JavaRDD
-     */
-    private static void doTask_63_only_ip(JavaRDD<Product> rddProduct) {
-
-        // SELECT t.ip, sum(t.price) sump
-        // FROM product t GROUP BY t.ip ORDER BY sump DESC LIMIT 10;
-
-        System.out.println();
-        System.out.println("6.3 approach I, aggragateByKey - fastest way");
-        task_63ip_approach_1(rddProduct).take(10).forEach(a -> {
-            System.out.println(a);
-        });
-
-        System.out.println();
-        System.out.println("6.3 approach II, slow way");
-        task_63ip_approach_2(rddProduct).take(10).forEach(a -> {
-            System.out.println(a);
-        });
-    }
-
-    /**
      * decide task N63 with country names
      *
      * @param rddProduct           JavaRDD
@@ -457,31 +372,19 @@ public class SparkRDD {
             JavaPairRDD<Long, Tuple2<CountryIP, CountryName>> rddCountryNameIP, SparkSession spark,
             Properties connectionProperties, JavaSparkContext sc) {
 
-        JavaPairRDD<Tuple2<Float, Long>, Tuple2<Long, Tuple2<CountryIP, CountryName>>> rdd63b = null;
-
-        System.out.println();
-        System.out.println("6.3 approach I, using union()");
-        {
-            rdd63b = task_63_approach_1(rddProduct, rddCountryNameIP);
-            rdd63b.cache();
-            // show in sorted view
-            rdd63b.mapToPair(f -> new Tuple2<>(f._1._1, new Tuple2<>(f._1, f._2))).sortByKey(false).take(10)
-                    .forEach(a -> {
-                        System.out.println(String.format("%.1f %d %s %s", a._1, a._2._2._2._2.getGeonameId(),
-                                a._2._2._2._2.getCountryName(), a._2._2._2._1.getNetwork()));
-                    });
-        }
+        JavaPairRDD<Float, Tuple2<Long, String>> rdd63b = null;
 
         System.out.println();
         System.out.println("6.3 approach II, using cartesian(), ");
         {
-            rdd63b = task_63_approach_2(rddProduct, rddCountryNameIP, sc);
+            rdd63b = task_63_approach_1(rddProduct, rddCountryNameIP, sc);
+            // rdd limit
+            rdd63b = sc.parallelize(rdd63b.sortByKey(false).take(10)).mapToPair((x) -> new Tuple2<>(x._1, x._2));
             rdd63b.cache();
             // show in sorted view
-            rdd63b.mapToPair(f -> new Tuple2<>(f._1._1, new Tuple2<>(f._1, f._2))).sortByKey(false).take(10)
+            rdd63b.take(10)
                     .forEach(a -> {
-                        System.out.println(String.format("%.1f %d %s %s", a._1, a._2._2._2._2.getGeonameId(),
-                                a._2._2._2._2.getCountryName(), a._2._2._2._1.getNetwork()));
+                        System.out.println(String.format("%.1f %d %s", a._1, a._2._1, a._2._2));
                     });
         }
 
@@ -490,11 +393,10 @@ public class SparkRDD {
             StructType schema = DataTypes
                     .createStructType(Arrays.asList(DataTypes.createStructField("sump", DataTypes.FloatType, true),
                             DataTypes.createStructField("geonameId", DataTypes.LongType, true),
-                            DataTypes.createStructField("countryName", DataTypes.StringType, true),
-                            DataTypes.createStructField("IP", DataTypes.StringType, true)));
+                            DataTypes.createStructField("countryName", DataTypes.StringType, true)));
             JavaRDD<Row> rddRow = rdd63b
-                    .map((Tuple2<Tuple2<Float, Long>, Tuple2<Long, Tuple2<CountryIP, CountryName>>> row) -> RowFactory
-                            .create(row._1._1, row._1._2, row._2._2._2.getCountryName(), row._2._2._1.getNetwork()));
+                    .map((Tuple2<Float, Tuple2<Long, String>> row) -> RowFactory
+                            .create(row._1, row._2._1, row._2._2));
             spark.createDataFrame(rddRow, schema).write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB,
                     OUT_NAME_63, connectionProperties);
         }
@@ -545,9 +447,6 @@ public class SparkRDD {
         //
         // 6.3 Select top 10 countries with the highest money spending
         //
-
-        // show only IP (without country names!)
-        doTask_63_only_ip(rddProduct);
 
         // load countries data and join countryIP & countryName
         JavaPairRDD<Long, CountryIP> aIP = rddCountryIP.mapToPair(f -> new Tuple2<>(f.getGeonameId(), f));
