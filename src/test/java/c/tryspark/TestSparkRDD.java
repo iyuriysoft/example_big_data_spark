@@ -8,6 +8,7 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.FixMethodOrder;
@@ -53,9 +54,14 @@ public class TestSparkRDD {
     @BeforeClass
     public static void init() throws IllegalArgumentException, IOException {
         SparkConf conf = new SparkConf();
-        conf.setMaster("local[2]");
+        conf.setMaster("local[*]");
         conf.setAppName("junit");
         sparkCtx = new JavaSparkContext(conf);
+    }
+    
+    @AfterClass
+    public static void exit() {
+        sparkCtx.close();
     }
 
     @Test
