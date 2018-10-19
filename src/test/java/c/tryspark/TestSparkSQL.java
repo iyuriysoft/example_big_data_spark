@@ -3,11 +3,11 @@ package c.tryspark;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.apache.spark.SparkConf;
-import org.apache.spark.api.java.JavaPairRDD;
-import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.sql.SparkSession;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -15,19 +15,19 @@ import org.junit.FixMethodOrder;
 import org.junit.Test;
 import org.junit.runners.MethodSorters;
 
-import scala.Tuple2;
 import schema.CountryIP;
 import schema.CountryName;
 import schema.Product;
-import tryspark.SparkRDD;
+import tryspark.SparkSQL;
 
 /**
- * Unit test for Spark RDD.
+ * Unit test for Spark SQL.
  */
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-public class TestSparkRDD {
+public class TestSparkSQL {
 
     private static JavaSparkContext sparkCtx;
+    private static SparkSession spark;
     private static Product[] arInput = new Product[] {
             new Product("product2, 504.8, 2010-10-20 14:01:47.520, category0, 12.68.11.1"),
             new Product("product2, 500.0, 2010-10-20 18:14:09.600, category0, 172.68.11.1"),
@@ -57,8 +57,9 @@ public class TestSparkRDD {
         conf.setMaster("local[*]");
         conf.setAppName("junit");
         sparkCtx = new JavaSparkContext(conf);
+        spark = SparkSession.builder().config(conf).getOrCreate();
     }
-    
+
     @AfterClass
     public static void exit() {
         sparkCtx.close();
@@ -66,10 +67,12 @@ public class TestSparkRDD {
 
     @Test
     public void test_Task51_1() {
-        JavaRDD<Product> inputRDD = sparkCtx.parallelize(Arrays.asList(arInput));
-        JavaPairRDD<Integer, String> result = SparkRDD.task_51_approach_1(inputRDD);
+        spark.createDataFrame(sparkCtx.parallelize(Arrays.asList(arInput)), Product.class)
+                .createOrReplaceTempView("product");
         
-        List<String> actuals = result.map(f -> String.format("%d %s", f._1, f._2)).collect();
+        List<String> actuals = spark.sql(SparkSQL.task_51("product")).collectAsList().stream()
+                .map(f -> String.format("%d %s", f.get(1), f.get(0)))
+                .collect(Collectors.toList());
         List<String> expecteds = Arrays.asList("4 category0", "4 category1", "1 category2", "1 category3");
         expecteds.stream().forEach(f -> Assert.assertTrue(actuals.contains(f)));
         Assert.assertEquals(actuals.size(), 4);
@@ -77,10 +80,12 @@ public class TestSparkRDD {
 
     @Test
     public void test_Task52_1() {
-        JavaRDD<Product> inputRDD = sparkCtx.parallelize(Arrays.asList(arInput));
-        JavaPairRDD<Integer, Tuple2<String, String>> result = SparkRDD.task_52_approach_1(inputRDD);
+        spark.createDataFrame(sparkCtx.parallelize(Arrays.asList(arInput)), Product.class)
+                .createOrReplaceTempView("product");
         
-        List<String> actuals = result.map(f -> String.format("%d %s %s", f._1, f._2._1, f._2._2)).collect();
+        List<String> actuals = spark.sql(SparkSQL.task_52("product")).collectAsList().stream()
+                .map(f -> String.format("%d %s %s", f.get(2), f.get(1), f.get(0)))
+                .collect(Collectors.toList());
         List<String> expecteds = Arrays.asList("4 category0 product2", "3 category1 product0", "1 category1 product2",
                 "1 category3 product4", "1 category2 product1");
         expecteds.stream().forEach(f -> Assert.assertTrue(actuals.contains(f)));
@@ -90,18 +95,17 @@ public class TestSparkRDD {
 
     @Test
     public void test_Task63_1() {
-        JavaRDD<CountryName> rddCountryName = sparkCtx.parallelize(Arrays.asList(arCountryName));
-        JavaRDD<CountryIP> rddCountryIP = sparkCtx.parallelize(Arrays.asList(arCountryIP));
-        JavaRDD<Product> inputRDD = sparkCtx.parallelize(Arrays.asList(arInput));
-
-        JavaPairRDD<Long, CountryIP> aIP = rddCountryIP.mapToPair(f -> new Tuple2<>(f.getGeonameId(), f));
-        JavaPairRDD<Long, CountryName> aName = rddCountryName.mapToPair(f -> new Tuple2<>(f.getGeonameId(), f));
-        JavaPairRDD<Long, Tuple2<CountryIP, CountryName>> rddCountryNameIP = aIP.join(aName);
-
-        JavaPairRDD<Float, Tuple2<Long, String>> result = SparkRDD
-                .task_63_approach_1(inputRDD, rddCountryNameIP, sparkCtx);
-
-        List<String> actuals = result.map(f -> String.format("%.1f %d %s", f._1, f._2._1, f._2._2)).collect();
+        spark.createDataFrame(sparkCtx.parallelize(Arrays.asList(arInput)), Product.class)
+                .createOrReplaceTempView("product");
+        spark.createDataFrame(sparkCtx.parallelize(Arrays.asList(arCountryIP)), CountryIP.class)
+                .createOrReplaceTempView("countryip");
+        spark.createDataFrame(sparkCtx.parallelize(Arrays.asList(arCountryName)), CountryName.class)
+                .createOrReplaceTempView("countryname");
+        
+        List<String> actuals = spark.sql(SparkSQL.task_63("product", "countryip", "countryname")).collectAsList()
+                .stream()
+                .map(f -> String.format("%.1f %d %s", f.get(0), f.get(2), f.get(3)))
+                .collect(Collectors.toList());
         List<String> expecteds = Arrays.asList("2000.0 1 United States", "1000.4 6 Norway",
                 "2011.3 3 Republic of Korea");
         expecteds.stream().forEach(f -> Assert.assertTrue(actuals.contains(f)));

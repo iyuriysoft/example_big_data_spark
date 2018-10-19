@@ -11,7 +11,6 @@ import java.util.Properties;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.spark.SparkConf;
-import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
@@ -116,6 +115,65 @@ public class SparkDataframe {
         System.out.println("Database created successful");
     }
 
+    /**
+     * Select top 10 most frequently purchased categories
+     * 
+     * @param df list of Products
+     * @return dataset [category, count]
+     */
+    public static Dataset<Row> task_51(Dataset<Row> df) {
+        return df.select("category").groupBy("category").count().withColumnRenamed("count", "cnt")
+                .orderBy(col("cnt").desc()).limit(10);
+    }
+
+    /**
+     * Select top 10 most frequently purchased product in each category
+     * 
+     * @param df list of Products
+     * @return dataset [name of product, category, count]
+     */
+    public static Dataset<Row> task_52(Dataset<Row> df) {
+        return df.select("name", "category").groupBy("name", "category").count()
+                .withColumnRenamed("count", "cnt").as("b")
+                .join((df.select("category").groupBy("category").count().orderBy(col("count").desc()).as("a")),
+                        col("a.category").equalTo(col("b.category")), "inner")
+                .orderBy(col("cnt").desc()).limit(10).select("name", "b.category", "cnt");
+    }
+
+    /**
+     * 
+     * Select top 10 countries with the highest money spending
+     * 
+     * @param df        list of Products
+     * @param dfGeoIP   list of CountryIP
+     * @param dfGeoName list of CountryName
+     * @return Dataset [sum, count, geoname id, country name]
+     * 
+     *         SQL equivalent:
+     *
+     *         SELECT SUM(t.price) as summ, count(*) as cnt, t.geonameId,
+     *         tcn.countryName FROM (SELECT tp.price, tp.IP, tc.Network,
+     *         tc.geonameId FROM (select price, IP, IPAsLong from product) tp,
+     *         (select geonameId, Network, StartIPAsLong, EndIPAsLong from
+     *         countryip) tc WHERE tp.IPAsLong <= tc.EndIPAsLong AND tp.IPAsLong >=
+     *         tc.StartIPAsLong ORDER BY tc.geonameId) t INNER JOIN countryname tcn
+     *         ON t.geonameId = tcn.geonameId GROUP BY t.geonameId, tcn.countryName
+     *         ORDER BY summ DESC LIMIT 10");
+     *
+     */
+    public static Dataset<Row> task_63(Dataset<Row> df, Dataset<Row> dfGeoIP, Dataset<Row> dfGeoName) {
+        return df.select("ip", "IPAsLong", "price").withColumn("price", df.col("price").cast("Float"))
+                .join(dfGeoIP.as("b"),
+                        (col("b.EndIPAsLong").$greater(df.col("IPAsLong")))
+                                .and(col("b.StartIPAsLong").$less(df.col("IPAsLong"))),
+                        "inner")
+                .join(dfGeoName.as("a"), col("a.geonameId").equalTo(col("b.geonameId")), "inner")
+                .groupBy(col("a.geonameId"), col("a.countryName"))
+                .agg(functions.sum("price").as("sump"), functions.count("*").as("cnt"))
+                .orderBy(col("sump").desc()).limit(10)
+                .select(col("sump"), col("cnt"), col("a.geonameId"), col("countryName"));
+    }
+
     public static void main(String args[]) throws ClassNotFoundException, SQLException {
 
         Logger.getLogger("org").setLevel(Level.WARN);
@@ -138,23 +196,20 @@ public class SparkDataframe {
         JavaSparkContext sc = new JavaSparkContext(conf);
         SparkSession spark = SparkSession.builder().config(conf).getOrCreate();
 
-        // Create RDD & Dataframe
-        JavaRDD<Product> rddP = sc.textFile(PRODUCT_PATH).map(f -> new Product(f.split(",")));
-        Dataset<Row> df = spark.createDataFrame(rddP, Product.class);
+        // Create Dataframe
+        Dataset<Row> df = spark.createDataFrame(
+                sc.textFile(PRODUCT_PATH).map(f -> new Product(f.split(","))),
+                Product.class);
 
         System.out.println("Table product");
-        df.createOrReplaceTempView("product");
-        Dataset<Row> df2 = df.select("*").limit(3);
-        df2.show(5, false);
+        df.select("*").limit(3).show(5, false);
 
         //
         // 5.1
         //
         System.out.println("Select top 10  most frequently purchased categories:");
-        Dataset<Row> df_51 = df.select("category").groupBy("category").count().withColumnRenamed("count", "cnt")
-                .orderBy(col("cnt").desc()).limit(10);
+        Dataset<Row> df_51 = task_51(df);
         df_51.show();
-        df_51.printSchema();
         df_51.select("category", "cnt").write().mode(SaveMode.Overwrite).csv(OUT_51_PATH);
         df_51.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_51, connectionProperties);
 
@@ -162,11 +217,7 @@ public class SparkDataframe {
         // 5.2
         //
         System.out.println("Select top 10 most frequently purchased product in each category:");
-        Dataset<Row> df_52 = df.select("name", "category").groupBy("name", "category").count()
-                .withColumnRenamed("count", "cnt").as("b")
-                .join((df.select("category").groupBy("category").count().orderBy(col("count").desc()).as("a")),
-                        col("a.category").equalTo(col("b.category")), "inner")
-                .orderBy(col("cnt").desc()).limit(10).select("name", "b.category", "cnt");
+        Dataset<Row> df_52 = task_52(df);
         df_52.show();
         df_52.select("name", "category", "cnt").write().mode(SaveMode.Overwrite).csv(OUT_52_PATH);
         df_52.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_52, connectionProperties);
@@ -174,38 +225,16 @@ public class SparkDataframe {
         //
         // 6.3 with country name
         //
-        System.out.println("Select top 10 countries with the highest money spending");
-        JavaRDD<CountryIP> rddGeoIP = sc.textFile(COUNTRYIP_PATH).map(f -> new CountryIP(f.split(",")));
-        Dataset<Row> dfGeoIP = spark.createDataFrame(rddGeoIP, CountryIP.class);
-        dfGeoIP.createOrReplaceTempView("countryip");
+        System.out.println("Select top 10 countries with the highest money spending:");
+        Dataset<Row> dfGeoIP = spark.createDataFrame(
+                sc.textFile(COUNTRYIP_PATH).map(f -> new CountryIP(f.split(","))),
+                CountryIP.class);
+        Dataset<Row> dfGeoName = spark.createDataFrame(
+                sc.textFile(COUNTRYNAME_PATH).map(f -> new CountryName(f.split(","))),
+                CountryName.class);
 
-        JavaRDD<CountryName> rddGeoName = sc.textFile(COUNTRYNAME_PATH).map(f -> new CountryName(f.split(",")));
-        Dataset<Row> dfGeoName = spark.createDataFrame(rddGeoName, CountryName.class);
-        dfGeoName.createOrReplaceTempView("countryname");
-
-        // SQL equivalent:
-        //
-        // SELECT SUM(t.price) as summ, count(*) as cnt, t.geonameId, tcn.countryName
-        // FROM (SELECT tp.price, tp.IP, tc.Network, tc.geonameId
-        // FROM (select price, IP, IPAsLong from product) tp,
-        // (select geonameId, Network, StartIPAsLong, EndIPAsLong from countryip) tc
-        // WHERE tp.IPAsLong <= tc.EndIPAsLong AND tp.IPAsLong >= tc.StartIPAsLong ORDER
-        // BY tc.geonameId) t
-        // INNER JOIN countryname tcn ON t.geonameId = tcn.geonameId
-        // GROUP BY t.geonameId, tcn.countryName ORDER BY summ DESC LIMIT 10");
-        //
-
-        Dataset<Row> df_63 = df.select("ip", "IPAsLong", "price").withColumn("price", df.col("price").cast("Float"))
-                .join(dfGeoIP.as("b"),
-                        (col("b.EndIPAsLong").$greater(df.col("IPAsLong")))
-                                .and(col("b.StartIPAsLong").$less(df.col("IPAsLong"))),
-                        "inner")
-                .join(dfGeoName.as("a"), col("a.geonameId").equalTo(col("b.geonameId")), "inner")
-                .groupBy(col("a.geonameId"), col("a.countryName"))
-                .agg(functions.sum("price").as("sump"), functions.count("*").as("cnt"))
-                .orderBy(col("sump").desc()).limit(10)
-                .select(col("sump"), col("cnt"), col("a.geonameId"), col("countryName"));
-
+        Dataset<Row> df_63 = task_63(df, dfGeoIP, dfGeoName);
+        df_63.cache();
         df_63.show();
         df_63.select("sump", "cnt", "geonameId", "countryName").write().mode(SaveMode.Overwrite).csv(OUT_63_PATH);
         df_63.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_63, connectionProperties);
