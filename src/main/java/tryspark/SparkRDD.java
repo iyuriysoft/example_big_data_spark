@@ -373,7 +373,7 @@ public class SparkRDD {
         JavaPairRDD<Float, Tuple2<Long, String>> rdd63b = null;
 
         System.out.println();
-        System.out.println("6.3 approach II, using cartesian(), ");
+        System.out.println("6.3 approach I, using cartesian(), ");
         {
             rdd63b = task_63_approach_1(rddProduct, rddCountryNameIP, sc);
             // rdd limit
