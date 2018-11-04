@@ -20,6 +20,7 @@ import schema.CountryIP;
 import schema.CountryName;
 import schema.Product;
 import tryspark.SparkRDD;
+import udf.UDFGetGeoID;
 
 /**
  * Unit test for Spark RDD.
@@ -91,6 +92,24 @@ public class TestSparkRDD {
     @Test
     public void test_Task63_1() {
         JavaRDD<CountryName> rddCountryName = sparkCtx.parallelize(Arrays.asList(arCountryName));
+        JavaRDD<Product> inputRDD = sparkCtx.parallelize(Arrays.asList(arInput));
+
+        JavaPairRDD<Long, CountryName> rddName = rddCountryName.mapToPair(f -> new Tuple2<>(f.getGeonameId(), f));
+
+        UDFGetGeoID.init(arCountryIP, sparkCtx);
+        JavaPairRDD<Float, Tuple2<Long, String>> result = SparkRDD
+                .task_63_approach_1(inputRDD, rddName, sparkCtx);
+
+        List<String> actuals = result.map(f -> String.format("%.1f %d %s", f._1, f._2._1, f._2._2)).collect();
+        List<String> expecteds = Arrays.asList("2000.0 1 United States", "1000.4 6 Norway",
+                "2011.3 3 Republic of Korea");
+        expecteds.stream().forEach(f -> Assert.assertTrue(actuals.contains(f)));
+        Assert.assertEquals(actuals.size(), 3);
+    }
+
+    @Test
+    public void test_Task63_2() {
+        JavaRDD<CountryName> rddCountryName = sparkCtx.parallelize(Arrays.asList(arCountryName));
         JavaRDD<CountryIP> rddCountryIP = sparkCtx.parallelize(Arrays.asList(arCountryIP));
         JavaRDD<Product> inputRDD = sparkCtx.parallelize(Arrays.asList(arInput));
 
@@ -99,7 +118,7 @@ public class TestSparkRDD {
         JavaPairRDD<Long, Tuple2<CountryIP, CountryName>> rddCountryNameIP = aIP.join(aName);
 
         JavaPairRDD<Float, Tuple2<Long, String>> result = SparkRDD
-                .task_63_approach_1(inputRDD, rddCountryNameIP, sparkCtx);
+                .task_63_approach_2(inputRDD, rddCountryNameIP, sparkCtx);
 
         List<String> actuals = result.map(f -> String.format("%.1f %d %s", f._1, f._2._1, f._2._2)).collect();
         List<String> expecteds = Arrays.asList("2000.0 1 United States", "1000.4 6 Norway",

@@ -4,6 +4,8 @@ import java.io.Serializable;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 
+import utils.CIDRUtils;
+
 public class Product implements Serializable {
     private static final long serialVersionUID = -1609125013029216468L;
     private SimpleDateFormat sdfDateTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
@@ -25,15 +27,6 @@ public class Product implements Serializable {
         this.ip = fields[4].trim();
     }
 
-    private Long dot2LongIP(String dottedIP) {
-        String[] addrArray = dottedIP.split("\\.");
-        long num = 0;
-        for (int i = 0; i < addrArray.length; i++) {
-            int power = 3 - i;
-            num += ((Integer.parseInt(addrArray[i].trim()) % 256) * Math.pow(256, power));
-        }
-        return num;
-    }
 
     public String getPrice() {
         return price;
@@ -60,7 +53,7 @@ public class Product implements Serializable {
     }
 
     public Long getIPAsLong() {
-        return dot2LongIP(ip);
+        return CIDRUtils.dot2LongIP(ip);
     }
 
     public String getDate() {

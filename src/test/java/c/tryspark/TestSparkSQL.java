@@ -1,10 +1,13 @@
 package c.tryspark;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.SparkSession;
@@ -53,6 +56,8 @@ public class TestSparkSQL {
 
     @BeforeClass
     public static void init() throws IllegalArgumentException, IOException {
+        Logger.getLogger("org").setLevel(Level.WARN);
+        Logger.getLogger("akka").setLevel(Level.WARN);
         SparkConf conf = new SparkConf();
         conf.setMaster("local[*]");
         conf.setAppName("junit");
@@ -94,7 +99,7 @@ public class TestSparkSQL {
     }
 
     @Test
-    public void test_Task63_1() {
+    public void test_Task63_1() throws FileNotFoundException, IOException {
         spark.createDataFrame(sparkCtx.parallelize(Arrays.asList(arInput)), Product.class)
                 .createOrReplaceTempView("product");
         spark.createDataFrame(sparkCtx.parallelize(Arrays.asList(arCountryIP)), CountryIP.class)
@@ -102,7 +107,28 @@ public class TestSparkSQL {
         spark.createDataFrame(sparkCtx.parallelize(Arrays.asList(arCountryName)), CountryName.class)
                 .createOrReplaceTempView("countryname");
         
-        List<String> actuals = spark.sql(SparkSQL.task_63("product", "countryip", "countryname")).collectAsList()
+        SparkSQL.setupUDFs(spark, arCountryIP);
+        
+        List<String> actuals = spark.sql(SparkSQL.task_63("product", "countryname")).collectAsList()
+                .stream()
+                .map(f -> String.format("%.1f %d %s", f.get(0), f.get(2), f.get(3)))
+                .collect(Collectors.toList());
+        List<String> expecteds = Arrays.asList("2000.0 1 United States", "1000.4 6 Norway",
+                "2011.3 3 Republic of Korea");
+        expecteds.stream().forEach(f -> Assert.assertTrue(actuals.contains(f)));
+        Assert.assertEquals(actuals.size(), 3);
+    }
+
+    @Test
+    public void test_Task63_2() {
+        spark.createDataFrame(sparkCtx.parallelize(Arrays.asList(arInput)), Product.class)
+                .createOrReplaceTempView("product");
+        spark.createDataFrame(sparkCtx.parallelize(Arrays.asList(arCountryIP)), CountryIP.class)
+                .createOrReplaceTempView("countryip");
+        spark.createDataFrame(sparkCtx.parallelize(Arrays.asList(arCountryName)), CountryName.class)
+                .createOrReplaceTempView("countryname");
+        
+        List<String> actuals = spark.sql(SparkSQL.task_63a("product", "countryip", "countryname")).collectAsList()
                 .stream()
                 .map(f -> String.format("%.1f %d %s", f.get(0), f.get(2), f.get(3)))
                 .collect(Collectors.toList());

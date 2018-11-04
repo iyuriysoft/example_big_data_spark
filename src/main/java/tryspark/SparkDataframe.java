@@ -1,27 +1,6 @@
 package tryspark;
 
-import static org.apache.spark.sql.functions.col;
-
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.Properties;
-
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-import org.apache.spark.SparkConf;
-import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.Row;
-import org.apache.spark.sql.SaveMode;
-import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.functions;
-
-import schema.CountryIP;
-import schema.CountryName;
-import schema.Product;
-
+import static org.apache.spark.sql.functions.callUDF;
 //|  category|cnt|
 //+----------+---+
 //| category9|163|
@@ -79,13 +58,38 @@ import schema.Product;
 //|28451.199981689453|  57|  3469034|             Brazil|
 //| 25028.09994506836|  50|  3175395|              Italy|
 //+------------------+----+---------+-------------------+
+import static org.apache.spark.sql.functions.col;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.Properties;
+
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+import org.apache.spark.SparkConf;
+import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SaveMode;
+import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.functions;
+import org.apache.spark.sql.types.DataTypes;
+
+import schema.CountryIP;
+import schema.CountryName;
+import schema.Product;
+import udf.UDFGetGeoID;
 
 public class SparkDataframe {
-    private static final String MYSQL_DB = "dbo";
     private static final String MYSQL_DRIVER = "com.mysql.jdbc.Driver";
-    private static final String MYSQL_CONNECTION_URL = "jdbc:mysql://localhost/";
-    private static final String MYSQL_USERNAME = "root";
-    private static final String MYSQL_PWD = "password";
+    private static String MYSQL_DB = "dbo";
+    private static String MYSQL_CONNECTION_URL = "jdbc:mysql://localhost/";
+    private static String MYSQL_USERNAME = "root";
+    private static String MYSQL_PWD = "password";
 
     private static final String DATA_PATH = "/Users/Shared/test/";
     private static final String INP_PRODUCT = "input3000.txt";
@@ -96,13 +100,13 @@ public class SparkDataframe {
     private static final String OUT_NAME_52 = "table52";
     private static final String OUT_NAME_63 = "table63";
 
-    private static final String PRODUCT_PATH = DATA_PATH + INP_PRODUCT;
-    private static final String COUNTRYIP_PATH = DATA_PATH + INP_COUNTRYIP;
-    private static final String COUNTRYNAME_PATH = DATA_PATH + INP_COUNTRYNAME;
+    private static String PRODUCT_PATH = DATA_PATH + INP_PRODUCT;
+    private static String COUNTRYIP_PATH = DATA_PATH + INP_COUNTRYIP;
+    private static String COUNTRYNAME_PATH = DATA_PATH + INP_COUNTRYNAME;
 
-    private static final String OUT_51_PATH = DATA_PATH + OUT_NAME_51 + "." + EXT;
-    private static final String OUT_52_PATH = DATA_PATH + OUT_NAME_52 + "." + EXT;
-    private static final String OUT_63_PATH = DATA_PATH + OUT_NAME_63 + "." + EXT;
+    private static final String OUT_51_PATH = OUT_NAME_51 + "." + EXT;
+    private static final String OUT_52_PATH = OUT_NAME_52 + "." + EXT;
+    private static final String OUT_63_PATH = OUT_NAME_63 + "." + EXT;
 
     private static void prepareMySql(String dbname) throws ClassNotFoundException, SQLException {
         Class.forName(MYSQL_DRIVER);
@@ -113,6 +117,30 @@ public class SparkDataframe {
         stmt.executeUpdate("CREATE DATABASE IF NOT EXISTS " + dbname);
         stmt.close();
         System.out.println("Database created successful");
+    }
+
+    /**
+     * Register UDF
+     * 
+     * @param spark    spark session
+     * @param filename country ip addresses filename
+     * @throws FileNotFoundException
+     * @throws IOException
+     */
+    public static void setupUDFs(SparkSession spark, String filename) throws FileNotFoundException, IOException {
+        UDFGetGeoID.init(filename, spark);
+        spark.udf().registerJava("getGeoId", UDFGetGeoID.class.getName(), DataTypes.LongType);
+    }
+
+    /**
+     * Register UDF
+     * 
+     * @param spark session
+     * @param ar    array of CountryIP
+     */
+    public static void setupUDFs(SparkSession spark, CountryIP[] ar) {
+        UDFGetGeoID.init(ar, spark);
+        spark.udf().registerJava("getGeoId", UDFGetGeoID.class.getName(), DataTypes.LongType);
     }
 
     /**
@@ -142,7 +170,26 @@ public class SparkDataframe {
 
     /**
      * 
-     * Select top 10 countries with the highest money spending
+     * Select top 10 countries with the highest money spending (fast)
+     *
+     * @param df        list of Product
+     * @param dfGeoName list of CountryName
+     * @return Dataset [sum, count, geoname id, country name]
+     */
+    public static Dataset<Row> task_63(Dataset<Row> df, Dataset<Row> dfGeoName) {
+        return df.select(col("ip"), col("IPAsLong"), col("price"), callUDF("getGeoId", col("IPAsLong")))
+                .withColumnRenamed("UDF(IPAsLong)", "getGeoId")
+                .withColumn("price", df.col("price").cast("Float"))
+                .join(dfGeoName.as("a"), col("a.geonameId").equalTo(col("getGeoId")), "inner")
+                .groupBy(col("a.geonameId"), col("a.countryName"))
+                .agg(functions.sum("price").as("sump"), functions.count("*").as("cnt"))
+                .orderBy(col("sump").desc()).limit(10)
+                .select(col("sump"), col("cnt"), col("a.geonameId"), col("countryName"));
+    }
+
+    /**
+     * 
+     * Select top 10 countries with the highest money spending (slow)
      * 
      * @param df        list of Products
      * @param dfGeoIP   list of CountryIP
@@ -161,7 +208,7 @@ public class SparkDataframe {
      *         ORDER BY summ DESC LIMIT 10");
      *
      */
-    public static Dataset<Row> task_63(Dataset<Row> df, Dataset<Row> dfGeoIP, Dataset<Row> dfGeoName) {
+    public static Dataset<Row> task_63a(Dataset<Row> df, Dataset<Row> dfGeoIP, Dataset<Row> dfGeoName) {
         return df.select("ip", "IPAsLong", "price").withColumn("price", df.col("price").cast("Float"))
                 .join(dfGeoIP.as("b"),
                         (col("b.EndIPAsLong").$greater(df.col("IPAsLong")))
@@ -174,7 +221,30 @@ public class SparkDataframe {
                 .select(col("sump"), col("cnt"), col("a.geonameId"), col("countryName"));
     }
 
-    public static void main(String args[]) throws ClassNotFoundException, SQLException {
+    public static void main(String args[])
+            throws ClassNotFoundException, FileNotFoundException, IOException {
+
+        if (args.length == 7) {
+            PRODUCT_PATH = args[0];
+            COUNTRYIP_PATH = args[1];
+            COUNTRYNAME_PATH = args[2];
+            MYSQL_CONNECTION_URL = args[3];
+            MYSQL_DB = args[4];
+            MYSQL_USERNAME = args[5];
+            MYSQL_PWD = args[6];
+        } else {
+            System.out.println("Usage: app <product_path> <country_ip_path> <country_name_path>");
+            System.out.println("           <mysql_url> <mysql_db> <mysql_user> <mysql_pwd>");
+        }
+        System.out.println();
+        System.out.println(String.format("product: %s", PRODUCT_PATH));
+        System.out.println(String.format("countryIP: %s", COUNTRYIP_PATH));
+        System.out.println(String.format("CountryName: %s", COUNTRYNAME_PATH));
+        System.out.println(String.format("MySql url: %s", MYSQL_CONNECTION_URL));
+        System.out.println(String.format("MySql database: %s", MYSQL_DB));
+        System.out.println(String.format("MySql user: %s", MYSQL_USERNAME));
+        System.out.println(String.format("MySql pwd: %s", MYSQL_PWD));
+        System.out.println();
 
         Logger.getLogger("org").setLevel(Level.WARN);
         Logger.getLogger("akka").setLevel(Level.WARN);
@@ -183,7 +253,12 @@ public class SparkDataframe {
         connectionProperties.put("user", MYSQL_USERNAME);
         connectionProperties.put("password", MYSQL_PWD);
 
-        prepareMySql(MYSQL_DB);
+        try {
+            prepareMySql(MYSQL_DB);
+        } catch (SQLException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
 
         //
         // become a record in RDD
@@ -202,42 +277,82 @@ public class SparkDataframe {
                 Product.class);
 
         System.out.println("Table product");
-        df.select("*").limit(3).show(5, false);
+        df.select(col("*")).limit(3).show();
+
+        long startTime = 0;
 
         //
         // 5.1
         //
         System.out.println("Select top 10  most frequently purchased categories:");
+        startTime = System.currentTimeMillis();
         Dataset<Row> df_51 = task_51(df);
         df_51.show();
-        df_51.select("category", "cnt").write().mode(SaveMode.Overwrite).csv(OUT_51_PATH);
-        df_51.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_51, connectionProperties);
+        System.out.println(System.currentTimeMillis() - startTime);
+        try {
+            df_51.select("category", "cnt").write().mode(SaveMode.Overwrite).csv(OUT_51_PATH);
+            df_51.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_51,
+                    connectionProperties);
+        } catch (Exception e) {
+            // TODO: handle exception
+            e.printStackTrace();
+        }
 
         //
         // 5.2
         //
         System.out.println("Select top 10 most frequently purchased product in each category:");
+        startTime = System.currentTimeMillis();
         Dataset<Row> df_52 = task_52(df);
         df_52.show();
-        df_52.select("name", "category", "cnt").write().mode(SaveMode.Overwrite).csv(OUT_52_PATH);
-        df_52.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_52, connectionProperties);
+        System.out.println(System.currentTimeMillis() - startTime);
+        try {
+            df_52.select("name", "category", "cnt").write().mode(SaveMode.Overwrite).csv(OUT_52_PATH);
+            df_52.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_52,
+                    connectionProperties);
+        } catch (Exception e) {
+            // TODO: handle exception
+            e.printStackTrace();
+        }
+
+        //
+        // 6.3 with country name (fast)
+        //
+        System.out.println("Select top 10 countries with the highest money spending (fast)");
+
+        setupUDFs(spark, COUNTRYIP_PATH);
+
+        Dataset<Row> dfGeoName = spark.createDataFrame(
+                sc.textFile(COUNTRYNAME_PATH).map(f -> new CountryName(f.split(","))),
+                CountryName.class).cache();
+
+        startTime = System.currentTimeMillis();
+        Dataset<Row> df_63 = task_63(df, dfGeoName);
+        df_63.cache();
+        df_63.show();
+        System.out.println(System.currentTimeMillis() - startTime);
+        try {
+            df_63.select("sump", "cnt", "geonameId", "countryName").write().mode(SaveMode.Overwrite).csv(OUT_63_PATH);
+            df_63.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_63,
+                    connectionProperties);
+        } catch (Exception e) {
+            // TODO: handle exception
+            e.printStackTrace();
+        }
 
         //
         // 6.3 with country name
         //
-        System.out.println("Select top 10 countries with the highest money spending:");
+        System.out.println("Select top 10 countries with the highest money spending");
         Dataset<Row> dfGeoIP = spark.createDataFrame(
                 sc.textFile(COUNTRYIP_PATH).map(f -> new CountryIP(f.split(","))),
-                CountryIP.class);
-        Dataset<Row> dfGeoName = spark.createDataFrame(
-                sc.textFile(COUNTRYNAME_PATH).map(f -> new CountryName(f.split(","))),
-                CountryName.class);
+                CountryIP.class).cache();
 
-        Dataset<Row> df_63 = task_63(df, dfGeoIP, dfGeoName);
-        df_63.cache();
-        df_63.show();
-        df_63.select("sump", "cnt", "geonameId", "countryName").write().mode(SaveMode.Overwrite).csv(OUT_63_PATH);
-        df_63.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_63, connectionProperties);
+        startTime = System.currentTimeMillis();
+        Dataset<Row> df_63a = task_63a(df, dfGeoIP, dfGeoName);
+        df_63a.cache();
+        df_63a.show();
+        System.out.println(System.currentTimeMillis() - startTime);
 
         sc.close();
     }

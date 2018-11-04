@@ -94,13 +94,30 @@ public class TestSparkDataframe {
     }
 
     @Test
+    public void test_Task63() {
+        Dataset<Row> df = spark.createDataFrame(sparkCtx.parallelize(Arrays.asList(arInput)), Product.class);
+        Dataset<Row> dfGeoName = spark.createDataFrame(sparkCtx.parallelize(Arrays.asList(arCountryName)),
+                CountryName.class);
+        
+        SparkDataframe.setupUDFs(spark, arCountryIP);
+        
+        List<String> actuals = SparkDataframe.task_63(df, dfGeoName).collectAsList().stream()
+                .map(f -> String.format("%.1f %d %s", f.get(0), f.get(2), f.get(3)))
+                .collect(Collectors.toList());
+        List<String> expecteds = Arrays.asList("2000.0 1 United States", "1000.4 6 Norway",
+                "2011.3 3 Republic of Korea");
+        expecteds.stream().forEach(f -> Assert.assertTrue(actuals.contains(f)));
+        Assert.assertEquals(actuals.size(), 3);
+    }
+
+    @Test
     public void test_Task63_1() {
         Dataset<Row> df = spark.createDataFrame(sparkCtx.parallelize(Arrays.asList(arInput)), Product.class);
         Dataset<Row> dfGeoIP = spark.createDataFrame(sparkCtx.parallelize(Arrays.asList(arCountryIP)), CountryIP.class);
         Dataset<Row> dfGeoName = spark.createDataFrame(sparkCtx.parallelize(Arrays.asList(arCountryName)),
                 CountryName.class);
         
-        List<String> actuals = SparkDataframe.task_63(df, dfGeoIP, dfGeoName).collectAsList().stream()
+        List<String> actuals = SparkDataframe.task_63a(df, dfGeoIP, dfGeoName).collectAsList().stream()
                 .map(f -> String.format("%.1f %d %s", f.get(0), f.get(2), f.get(3)))
                 .collect(Collectors.toList());
         List<String> expecteds = Arrays.asList("2000.0 1 United States", "1000.4 6 Norway",
