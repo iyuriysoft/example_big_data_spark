@@ -74,7 +74,7 @@ public class UDFGetGeoID implements UDF1<Long, Long> {
     }
 
     public static Long ip2geo(Long v) {
-        if (broadcastMap.value().isEmpty()) {
+        if (map.isEmpty() || broadcastMap.value().isEmpty()) {
             throw new RuntimeException("TreeMap is empty! Before using it function init(...) should be called");
         }
         if (v == null) {
