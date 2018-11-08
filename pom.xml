@@ -8,7 +8,6 @@
 	<version>0.0.1</version>
 	<packaging>jar</packaging>
 
-
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven.compiler.source>1.8</maven.compiler.source>
@@ -16,6 +15,27 @@
 		<spark.version>2.1.0</spark.version>
 	</properties>
 
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<version>3.1.0</version>
+				<configuration>
+					<archive>
+						<manifest>
+							<!-- <addClasspath>true</addClasspath>
+							<classpathPrefix>lib/</classpathPrefix> -->
+							<mainClass>tryspark.SparkSQL</mainClass>
+						</manifest>
+					</archive>
+					<descriptorRefs>
+						<descriptorRef>jar-with-dependencies</descriptorRef>
+					</descriptorRefs>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
 	<dependencies>
 		<dependency>
 			<groupId>org.apache.commons</groupId>
@@ -56,28 +76,4 @@
 		</dependency>
 	</dependencies>
 
-	<!--<repositories> <repository> <id>maven-restlet</id> <name>Public online 
-		Restlet repository</name> <url>http://maven.restlet.org</url> </repository> 
-		</repositories> <name>b</name> <url>http://maven.apache.org</url> <url>http://maven.restlet.org</url> 
-		<url>http://central.maven.org/maven2/</url> -->
-	<!-- <dependency> <groupId>com.holdenkarau</groupId> <artifactId>spark-testing-base_2.11</artifactId> 
-		<version>${spark.version}_0.10.0</version> <scope>test</scope> </dependency> -->
-	<!-- <repositories> <repository> <id>maven_jdo2</id> <name>repository jdo2</name> 
-		<url>https://repository.cloudera.com/content/repositories/third-party/</url> 
-		</repository> <repository> <id>maven</id> <name>repository</name> <url>http://central.maven.org</url> 
-		</repository> <repository> <id>apache</id> <name>repository apache</name> 
-		<url>http://maven.apache.org</url> </repository> <repository> <id>scala-tools</id> 
-		<url>https://oss.sonatype.org/content/groups/scala-tools</url> </repository> 
-		</repositories> <properties> <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding> 
-		<flume.version>1.6.0</flume.version> <hadoop.version>0.20.2</hadoop.version> 
-		<hive.version>0.10.0</hive.version> <scala.binary.version>2.11</scala.binary.version> 
-		</properties> <build> <plugins> <plugin> <groupId>org.apache.maven.plugins</groupId> 
-		<artifactId>maven-jar-plugin</artifactId> <configuration> <archive> <manifest> 
-		<mainClass>c.tryspark.MySparkTask</mainClass> </manifest> </archive> </configuration> 
-		</plugin> </plugins> </build> -->
-	<!-- <dependencies> <dependency> <groupId>javax.jdo</groupId> <artifactId>jdo2-api</artifactId> 
-		<version>2.3-ec</version> </dependency> <dependency> <groupId>junit</groupId> 
-		<artifactId>junit</artifactId> <version>3.8.1</version> <scope>test</scope> 
-		</dependency> <dependency> <groupId>org.apache.spark</groupId> <artifactId>spark-sql_2.11</artifactId> 
-		<version>2.3.1</version> </dependency> </dependencies> -->
 </project>
