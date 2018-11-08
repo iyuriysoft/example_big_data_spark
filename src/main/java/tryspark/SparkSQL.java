@@ -280,8 +280,9 @@ public class SparkSQL {
         df_51.show();
         System.out.println(System.currentTimeMillis() - startTime);
         try {
-        df_51.select("category", "cnt").write().mode(SaveMode.Overwrite).csv(OUT_51_PATH);
-        df_51.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_51, connectionProperties);
+            df_51.select("category", "cnt").write().mode(SaveMode.Overwrite).csv(OUT_51_PATH);
+            df_51.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_51,
+                    connectionProperties);
         } catch (Exception e) {
             // TODO: handle exception
             e.printStackTrace();
@@ -296,8 +297,9 @@ public class SparkSQL {
         df_52.show();
         System.out.println(System.currentTimeMillis() - startTime);
         try {
-        df_52.select("name", "category", "cnt").write().mode(SaveMode.Overwrite).csv(OUT_52_PATH);
-        df_52.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_52, connectionProperties);
+            df_52.select("name", "category", "cnt").write().mode(SaveMode.Overwrite).csv(OUT_52_PATH);
+            df_52.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_52,
+                    connectionProperties);
         } catch (Exception e) {
             // TODO: handle exception
             e.printStackTrace();
@@ -312,23 +314,17 @@ public class SparkSQL {
         Dataset<Row> dfCountryName = spark.createDataFrame(
                 sc.textFile(COUNTRYNAME_PATH).map(f -> new CountryName(f.split(","))),
                 CountryName.class);
-        // Broadcast<List<Row>> broadcastName =
-        // sc.broadcast(dfCountryName.collectAsList());
-        // Broadcast<StructType> broadcastSchemaName =
-        // sc.broadcast(dfCountryName.schema());
-        // Dataset<Row> dfCountryName_distributed =
-        // spark.createDataFrame(broadcastName.value(), broadcastSchemaName.value());
         dfCountryName.cache().createOrReplaceTempView(COUNTRY_NAME);
 
         System.out.println("Select top 10 countries with the highest money spending (Fast)");
         startTime = System.currentTimeMillis();
         Dataset<Row> df_63 = spark.sql(task_63(PRODUCT, COUNTRY_NAME));
-        df_63.cache();
-        df_63.show();
+        df_63.cache().show();
         System.out.println(System.currentTimeMillis() - startTime);
         try {
-        df_63.select("summ", "cnt", "geonameId", "countryName").write().mode(SaveMode.Overwrite).csv(OUT_63_PATH);
-        df_63.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_63, connectionProperties);
+            df_63.select("summ", "cnt", "geonameId", "countryName").write().mode(SaveMode.Overwrite).csv(OUT_63_PATH);
+            df_63.write().mode(SaveMode.Overwrite).jdbc(MYSQL_CONNECTION_URL + MYSQL_DB, OUT_NAME_63,
+                    connectionProperties);
         } catch (Exception e) {
             // TODO: handle exception
             e.printStackTrace();
@@ -350,8 +346,7 @@ public class SparkSQL {
         System.out.println("Select top 10 countries with the highest money spending (Slow)");
         startTime = System.currentTimeMillis();
         Dataset<Row> df_63a = spark.sql(task_63a(PRODUCT, COUNTRY_IP, COUNTRY_NAME));
-        df_63a.cache();
-        df_63a.show();
+        df_63a.cache().show();
         System.out.println(System.currentTimeMillis() - startTime);
 
         sc.close();
